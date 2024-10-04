@@ -14,6 +14,11 @@ import { BridgeService } from "./scheduler/bridge.service";
 
 @Module({
   imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: false,
+      envFilePath: '.development.env',
+    }),
     TypeOrmModule.forRoot({
       type: 'mysql',
       host: 'localhost',
@@ -23,12 +28,6 @@ import { BridgeService } from "./scheduler/bridge.service";
       database: 'mint',
       entities: [Sepolia],
       synchronize: true,
-    }),
-    ConfigModule.forRoot({
-      isGlobal: true,
-      cache: false,
-      envFilePath:
-        process.env.NODE_ENV = '.development.env'
     }),
     ScheduleModule.forRoot(),
     HttpModule,

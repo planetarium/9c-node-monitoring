@@ -41,7 +41,7 @@ export class BridgeService implements OnModuleInit, OnModuleDestroy {
   }
 
   handleCron() {
-    this.logger.debug('burn 모니터링 시작');
+    // this.logger.debug('burn 모니터링 시작');
   }
 
 }

@@ -39,6 +39,6 @@ export class TasksService implements OnModuleInit, OnModuleDestroy {
   }
 
   handleCron() {
-    this.logger.debug('미완료 트랜잭션 실행');
+    // this.logger.debug('미완료 트랜잭션 실행');
   }
 }
