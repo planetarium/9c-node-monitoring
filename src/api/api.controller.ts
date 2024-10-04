@@ -12,8 +12,20 @@ export class ApiController {
     return await this.apiService.getRPCEndPoints();
   }
 
-  @Get('/test')
-  async test() {
-    return await this.apiService.test();
+  @Get('/send')
+  async send() {
+    const [ odinRPCEndpoints, heimdallRPCEndpoints ] = await this.apiService.getRPCEndPoints();
+    this.apiService.send(odinRPCEndpoints);
+    this.apiService.send(heimdallRPCEndpoints);
   }
+
+  @Get('/check')
+  async checkTx(@Query('endpoint') endpoint: string, @Query('txHash') txHash: string) {
+    const { txStatus } = await this.apiService.getTxStatus(endpoint, txHash);
+    if (txStatus === 'SUCCESS' || txStatus === 'FAILURE') {
+      console.log(`${txStatus}: ${txHash}`);
+      return txStatus;
+    }
+  }
+
 }
