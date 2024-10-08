@@ -4,12 +4,12 @@
 // import * as dotenv from 'dotenv';
 // import { ConfigModule } from '@nestjs/config';
 // import { HttpModule } from '@nestjs/axios';
-// import { transactionService } from "./transaction/transaction.service";
-// import { transactionModule } from "./transaction/transaction.module";
+// import { transactionService } from "./db/db.service";
+// import { transactionModule } from "./db/db.module";
 // import { MutexProviderModule } from "./mutex.provider";
 // import { TypeOrmModule } from "@nestjs/typeorm";
-// import { transaction } from "./transaction/transaction";
-// import { transactionRepository } from "./transaction/transaction.repository";
+// import { db } from "./db/db";
+// import { transactionRepository } from "./db/db.repository";
 //
 // describe('ApiController', () => {
 //   let apiController: ApiController;
@@ -29,7 +29,7 @@
 //           username: 'root',
 //           password: 'rootroot',
 //           database: 'mint',
-//           entities: [transaction],
+//           entities: [db],
 //           synchronize: true,
 //         }),
 //         ConfigModule.forRoot({

@@ -1,6 +1,5 @@
 import { Controller, Get, Query } from "@nestjs/common";
 import { ApiService } from "./api.service";
-import { ConfigService } from "@nestjs/config";
 
 
 @Controller('/api')
@@ -15,8 +14,8 @@ export class ApiController {
   @Get('/send')
   async send() {
     const [ odinRPCEndpoints, heimdallRPCEndpoints ] = await this.apiService.getRPCEndPoints();
-    this.apiService.send(odinRPCEndpoints);
-    this.apiService.send(heimdallRPCEndpoints);
+    this.apiService.send('odin', odinRPCEndpoints);
+    this.apiService.send('heimdall', heimdallRPCEndpoints);
   }
 
   @Get('/check')

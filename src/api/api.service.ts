@@ -8,41 +8,54 @@ import axios from "axios";
 import * as secp256k1 from "secp256k1"; //"secp256k1": "^5.0.0",
 import { encode, RecordView } from "@planetarium/bencodex"; //"@planetarium/bencodex": "^0.2.2",
 import { ethers } from "ethers"; //"ethers": "^5.5.1";
+import {NodeHealthService} from "./db/node-health/node-health.service";
 
 
 @Injectable()
 export class ApiService {
   private endPointListURL = "https://planets.nine-chronicles.com/planets/";
-  private RPC: string;
-  private accountAddresses: string[];
-  private privateKeys: string[];
-  private ACCOUNT: string = '0x1710caAb236dE8fE3a55a1a8744CC1E40cad5705';
-  private PRIVATE_KEY: string = this.configService.get('privateKey');
+  private accounts;
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly nodeHealthService: NodeHealthService
   ) {
-      this.privateKeys = [
-          this.configService.get<string>('PRIVATE_KEY_1'),
-          this.configService.get<string>('PRIVATE_KEY_2'),
-          this.configService.get<string>('PRIVATE_KEY_3'),
-          this.configService.get<string>('PRIVATE_KEY_4'),
-          this.configService.get<string>('PRIVATE_KEY_5'),
-          this.configService.get<string>('PRIVATE_KEY_6'),
-          this.configService.get<string>('PRIVATE_KEY_7'),
-          this.configService.get<string>('PRIVATE_KEY_8'),
+      this.accounts = [
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_1'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_1'),
+          },
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_2'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_2'),
+          },
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_3'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_3'),
+          },
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_4'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_4'),
+          },
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_5'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_5'),
+          },
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_6'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_6'),
+          },
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_7'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_7'),
+          },
+          {
+              privateKey: this.configService.get<string>('PRIVATE_KEY_8'),
+              address: this.configService.get<string>('ACCOUNT_ADDRESS_8'),
+          }
       ];
-      this.accountAddresses = [
-          this.configService.get<string>('ACCOUNT_ADDRESS_1'),
-          this.configService.get<string>('ACCOUNT_ADDRESS_2'),
-          this.configService.get<string>('ACCOUNT_ADDRESS_3'),
-          this.configService.get<string>('ACCOUNT_ADDRESS_4'),
-          this.configService.get<string>('ACCOUNT_ADDRESS_5'),
-          this.configService.get<string>('ACCOUNT_ADDRESS_6'),
-          this.configService.get<string>('ACCOUNT_ADDRESS_7'),
-          this.configService.get<string>('ACCOUNT_ADDRESS_8'),
-      ]
+
   }
 
   public async getRPCEndPoints() {
@@ -54,20 +67,22 @@ export class ApiService {
             }),
         ),
     );
-    const odinRPCEndpoints = data[0].rpcEndpoints;
-    const heimdallRPCEndpoints = data[1].rpcEndpoints;
+    const odinRPCEndpoints = data[0].rpcEndpoints['headless.gql'];
+    const heimdallRPCEndpoints = data[1].rpcEndpoints['headless.gql'];
     return [ odinRPCEndpoints, heimdallRPCEndpoints ];
   }
 
-  public async send(rpcEndpoints: string[]) {
+  public async send(groupName: string, rpcEndpoints: string[]) {
       for (let i = 0; i < rpcEndpoints.length; i++) {
-          if(i >= this.accountAddresses.length) //만약 엔드포인트가 훨씬 더 늘어났을 경우 계정 생성 바람.
+          if(i >= this.accounts.length) //만약 엔드포인트가 훨씬 더 늘어났을 경우 계정 생성 바람.
               break;
-          const sender =   this.accountAddresses[i];
-          const recipient = this.accountAddresses[(i + 1) % rpcEndpoints.length]; // 다음사람한테 주기.
+          const sender =   this.accounts[i].address;
+          const recipient = this.accounts[(i + 1) % rpcEndpoints.length].address; // 다음사람한테 주기.
           const action = this.makeTransferAction(sender, recipient);
-          const tx = await this.sendTx(rpcEndpoints[i], action, this.accountAddresses[i], this.privateKeys[i]);
-          console.log('Network', rpcEndpoints[i], 'sendtx', tx); //TODO 저장로직
+          const txHash = await this.sendTx(rpcEndpoints[i], action, this.accounts[i]);
+          console.log('Network', rpcEndpoints[i],'sendtx', txHash);
+          console.log('Sender', sender, 'Recipient', recipient);
+          await this.nodeHealthService.savePendingTx(groupName, rpcEndpoints[i], txHash)
       }
   }
 
@@ -110,9 +125,9 @@ export class ApiService {
         }
     }
 
-    async sendTx(endpoint: string, action: string, account: string, privateKey: string): Promise<string | undefined> {
-        const wallet = new ethers.Wallet(privateKey);
-        const nonce = await this.nextTxNonce(endpoint, account);
+    async sendTx(endpoint: string, action: string, account): Promise<string | undefined> {
+        const wallet = new ethers.Wallet(account.privateKey);
+        const nonce = await this.nextTxNonce(endpoint, account.address);
         const _unsignedTx = await this.unsignedTx(endpoint, wallet.publicKey.slice(2), action, nonce);
         const unsignedTxId = crypto.createHash('sha256').update(_unsignedTx, 'hex').digest();
         const { signature } = secp256k1.ecdsaSign(this.pad32(unsignedTxId), this.hexToBuffer(wallet.privateKey));

@@ -5,12 +5,12 @@ import { ApiService } from './api.service';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
-import { TasksService } from "./scheduler/tasks.service";
-import { SepoliaModule } from "./transaction/sepolia/sepolia.module";
-import { Sepolia } from "./transaction/sepolia/sepolia";
+import { NodeHealthModule } from "./db/node-health/node-health.module";
+import { NodeHealth } from "./db/node-health/node-health";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from 'path';
-import { BridgeService } from "./scheduler/bridge.service";
+import {NodeHealthService} from "./db/node-health/node-health.service";
+import {NodeHealthRepository} from "./db/node-health/node-health.repository";
 
 @Module({
   imports: [
@@ -25,19 +25,19 @@ import { BridgeService } from "./scheduler/bridge.service";
       port: 3306,
       username: 'root',
       password: 'rootroot',
-      database: 'mint',
-      entities: [Sepolia],
+      database: 'nodehealth',
+      entities: [NodeHealth],
       synchronize: true,
     }),
     ScheduleModule.forRoot(),
     HttpModule,
-    SepoliaModule,
+    NodeHealthModule,
     ServeStaticModule.forRoot({
       rootPath: join(__dirname, '../..','public'), // Serve from the 'public' directory
     }),
   ],
   controllers: [ApiController],
-  providers: [ApiService, TasksService, BridgeService],
+  providers: [ApiService],
   exports: [ApiService]
 })
 export class ApiModule {}
