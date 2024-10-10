@@ -14,17 +14,21 @@ export class ApiController {
   @Get('/send')
   async send() {
     const [ odinRPCEndpoints, heimdallRPCEndpoints ] = await this.apiService.getRPCEndPoints();
-    this.apiService.send('odin', odinRPCEndpoints);
-    this.apiService.send('heimdall', heimdallRPCEndpoints);
+    const commonTimestamp = new Date();
+    commonTimestamp.setSeconds(0, 0);
+    this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
+    this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
   }
 
   @Get('/check')
-  async checkTx(@Query('endpoint') endpoint: string, @Query('txHash') txHash: string) {
-    const { txStatus } = await this.apiService.getTxStatus(endpoint, txHash);
-    if (txStatus === 'SUCCESS' || txStatus === 'FAILURE') {
-      console.log(`${txStatus}: ${txHash}`);
-      return txStatus;
-    }
+  async checkTx() {
+    this.apiService.resolvePendingTransactions();
   }
+
+  @Get('/temp')
+  async temp() {
+    await this.apiService.tempSend('heimdall');
+  }
+
 
 }
