@@ -9,6 +9,8 @@ import * as secp256k1 from "secp256k1"; //"secp256k1": "^5.0.0",
 import { encode, RecordView } from "@planetarium/bencodex"; //"@planetarium/bencodex": "^0.2.2",
 import { ethers } from "ethers"; //"ethers": "^5.5.1";
 import {NodeHealthService} from "./db/node-health/node-health.service";
+import * as https from "node:https";
+import * as http from "node:http";
 
 
 @Injectable()
@@ -95,9 +97,9 @@ export class ApiService {
     }
 
     public async tempSend(groupName: string) {
-        const endpoint = 'https://heimdall-rpc-3.nine-chronicles.com/graphql';
-        const sender =   this.accounts[2].address;
-        const recipient = this.accounts[1].address; // 다음사람한테 주기.
+        const endpoint = 'https://odin-rpc-1.nine-chronicles.com/graphql';
+        const sender =   this.accounts[3].address;
+        const recipient = this.accounts[4].address; // 다음사람한테 주기.
         const action = Buffer.from(encode(new RecordView({
             type_id: 'transfer_asset5',
             values: {
@@ -105,7 +107,7 @@ export class ApiService {
                     new RecordView(
                         {
                             decimalPlaces: Buffer.from([0x02]),
-                            minters: null,
+                            minters: [this.hexToBuffer("0x47d082a115c63e7b58b1532d20e631538eafadde")],
                             ticker: "NCG",
                         },
                         "text"
@@ -116,7 +118,7 @@ export class ApiService {
                 sender: this.hexToBuffer(sender),
             }
         }, 'text'))).toString('hex');
-        const txHash = await this.sendTx(endpoint, action, this.accounts[2]);
+        const txHash = await this.sendTx(endpoint, action, this.accounts[3]);
         console.log('Network', endpoint,'sendtx', txHash);
         console.log('Sender', sender, 'Recipient', recipient);
         await this.waitForTx(endpoint, txHash);
@@ -297,6 +299,8 @@ export class ApiService {
     async getTxStatus(endpoint: string, txId: string) {
         let { data } = await axios({
             method: 'POST',
+            httpAgent: new http.Agent({ keepAlive: true }),
+            httpsAgent: new https.Agent({ keepAlive: true }),
             url: endpoint,
             data: {
                 "variables": { txId },
@@ -333,6 +337,8 @@ export class ApiService {
         results.forEach(result => {
             if(result.status.txStatus === 'SUCCESS')
                 this.nodeHealthService.updateCompletedTx(result.id);
+            else if(result.status.txStatus === 'STAGING')
+                this.nodeHealthService.updateStagingTx(result.id);
             else
                 this.nodeHealthService.updateFailedTx(result.id, result.status.exceptionNames);
             console.log(result);

@@ -3,375 +3,196 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Blockchain API Demo</title>
+  <title>Node Health Status (Last 30 Days)</title>
   <style>
-      body {
-          font-family: Arial, sans-serif;
-          background-color: #f5f5f5;
-          margin: 0;
-          padding: 20px;
-      }
-      .container {
-          max-width: 1200px;
-          margin: 0 auto;
-      }
-      .card-container {
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 20px;
-      }
-      .card {
-          background-color: #ffffff;
-          border: 1px solid #ddd;
-          border-radius: 8px;
-          padding: 20px;
-          box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-          width: 48%;
-      }
-      .card h3 {
-          margin-top: 0;
-      }
-      .status {
-          padding: 10px;
-          border-radius: 4px;
-          background-color: #e7f3fe;
-          border: 1px solid #b3d4fc;
-          margin-top: 10px;
-          display: none; /* Hidden by default, shown when data is loaded */
-      }
-      .status.success {
-          background-color: #e7ffe7;
-          border-color: #b3fcb3;
-      }
-      .status.error {
-          background-color: #ffe7e7;
-          border-color: #fcb3b3;
-      }
-      .btn {
-          padding: 10px 15px;
-          font-size: 16px;
-          color: #fff;
-          background-color: #007bff;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: background-color 0.3s;
-          position: relative;
-      }
-      .btn:hover {
-          background-color: #0056b3;
-      }
-      .loader {
-          display: none;
-          border: 3px solid #f3f3f3; /* Light grey */
-          border-top: 3px solid #007bff; /* Blue */
-          border-radius: 50%;
-          width: 16px;
-          height: 16px;
-          animation: spin 1s linear infinite;
-          margin-left: 10px;
-      }
-      @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-      }
-      input[type="text"] {
-          padding: 10px;
-          width: calc(100% - 22px);
-          margin-bottom: 10px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          font-size: 16px;
-      }
+    body {
+      font-family: Arial, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background-color: #f0f0f0;
+    }
+    .container {
+      background: #E2EDFF;
+      border-radius: 30px;
+      padding: 20px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    h1 {
+      text-align: center;
+      color: #333;
+    }
+    .grid-wrapper {
+      display: flex;
+      justify-content: center;
+      gap: 20px;
+    }
+    .grid-container {
+      display: flex;
+      flex-direction: row-reverse;
+      gap: 2px;
+    }
+    .day-column {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .status-cell {
+      width: 15px;
+      height: 15px;
+      background-color: #00ff00;
+      border-radius: 3px;
+      cursor: pointer;
+    }
+    .error {
+      background-color: #ff0000;
+    }
+    .tooltip {
+      position: absolute;
+      background-color: #333;
+      color: #fff;
+      padding: 5px;
+      border-radius: 3px;
+      font-size: 12px;
+      z-index: 100;
+      display: none;
+    }
+    .grid-label {
+      text-align: center;
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 <body>
-
 <div class="container">
-  <!-- Sepolia Operations -->
-
-  <div class="card-container">
-      <div class="card">  <!-- Burn Transaction with MetaMask -->
-        <h3>Burn Tokens with MetaMask</h3>
-        <input type="text" id="tokenContractAddress" placeholder="Enter Token Contract Address" />
-        <button class="btn" id="burnTokensBtn" onclick="burnTokens()">Burn Tokens <span id="burnTokensLoader" class="loader"></span></button>
-        <div id="burnTokensStatus" class="status"></div>
-      </div>
-  </div>
-
-
-
-
-  <div class="card-container">
-    <div class="card">
-      <h3>Check Balance on BNB</h3>
-      <input type="text" id="balanceBNBAddress" placeholder="Enter Wallet Address" />
-      <button class="btn" id="checkBNBBalanceBtn" onclick="checkBalanceBNB()">Check BNB Balance <span id="checkBNBBalanceLoader" class="loader"></span></button>
-      <div id="balanceBNBResult" class="status"></div>
+  <h1>Node Health Status (Last 30 Days)</h1>
+  <div class="grid-wrapper">
+    <div>
+      <div class="grid-label">Odin</div>
+      <div id="odinGrid" class="grid-container"></div>
     </div>
-
-    <div class="card">
-      <h3>Check Balance on Sepolia</h3>
-      <input type="text" id="balanceSepoliaAddress" placeholder="Enter Wallet Address" />
-      <button class="btn" id="checkSepoliaBalanceBtn" onclick="checkBalanceSepolia()">Check Sepolia Balance <span id="checkSepoliaBalanceLoader" class="loader"></span></button>
-      <div id="balanceSepoliaResult" class="status"></div>
+    <div>
+      <div class="grid-label">Heimdall</div>
+      <div id="heimdallGrid" class="grid-container"></div>
     </div>
   </div>
-
-  <!-- Other Operations -->
-  <div class="card-container">
-    <div class="card">
-      <h3>Check Transaction Status</h3>
-      <input type="text" id="txHash" placeholder="Enter Transaction Hash" />
-      <button class="btn" id="checkStatusBtn" onclick="checkStatus()">Check Status <span id="checkStatusLoader" class="loader"></span></button>
-      <div id="statusResult" class="status"></div>
-    </div>
-
-    <div class="card">
-      <h3>Transaction History</h3>
-      <input type="text" id="historyAddress" placeholder="Enter Wallet Address" />
-      <button class="btn" id="checkHistoryBtn" onclick="checkHistory()">Check History <span id="checkHistoryLoader" class="loader"></span></button>
-      <div id="historyResult" class="status"></div>
-    </div>
-  </div>
-
-  <div class="card-container">
-    <div class="card">
-      <h3>Check Burnt Amount</h3>
-      <input type="text" id="burnAddress" placeholder="Enter Wallet Address" />
-      <input type="text" id="tokenAddress" placeholder="Enter Token Address" />
-      <button class="btn" id="checkBurntAmountBtn" onclick="checkBurntAmount()">Check Burnt Amount <span id="checkBurntAmountLoader" class="loader"></span></button>
-      <div id="burnResult" class="status"></div>
-    </div>
-
-    <div class="card">
-      <h3>Process Block Confirmation (Sepolia)</h3>
-      <button class="btn" id="processBlockConfirmationSepoliaBtn" onclick="processBlockConfirmationSepolia()">Process <span id="processBlockConfirmationSepoliaLoader" class="loader"></span></button>
-      <div id="blockConfirmationSepoliaStatus" class="status"></div>
-    </div>
-  </div>
-
-
-  <div class="card-container">
-    <div class="card">
-      <h3>Process Block Confirmation (BNB)</h3>
-      <button class="btn" id="burnt" onclick="processBlockConfirmationBNB()">Process <span id="processBlockConfirmationBNBLoader" class="loader"></span></button>
-      <div id="blockConfirmationBNBStatus" class="status"></div>
-    </div>
-  </div>
-
-
-<script src="https://cdn.jsdelivr.net/gh/ethereum/web3.js@1.6.0/dist/web3.min.js"></script>
-<script>
-
-  async function checkStatus() {
-    const txHash = document.getElementById('txHash').value;
-    const button = document.getElementById('checkStatusBtn');
-    const loader = document.getElementById('checkStatusLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/status/sepolia?txHash=${txHash}`);
-      const result = await response.json();
-      showResult('statusResult', JSON.stringify(result), true);
-    } catch (error) {
-      showResult('statusResult', 'Error checking status: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  async function checkBalanceSepolia() {
-    const address = document.getElementById('balanceSepoliaAddress').value;
-    const button = document.getElementById('checkSepoliaBalanceBtn');
-    const loader = document.getElementById('checkSepoliaBalanceLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/balanceOf/sepolia?address=${address}`);
-      const result = await response.text();
-      showResult('balanceSepoliaResult', 'Sepolia Balance: ' + result, true);
-    } catch (error) {
-      showResult('balanceSepoliaResult', 'Error checking Sepolia balance: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  async function checkBalanceBNB() {
-    const address = document.getElementById('balanceBNBAddress').value;
-    const button = document.getElementById('checkBNBBalanceBtn');
-    const loader = document.getElementById('checkBNBBalanceLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/balanceOf/bnb?address=${address}`);
-      const result = await response.text();
-      showResult('balanceBNBResult', 'BNB Balance: ' + result, true);
-    } catch (error) {
-      showResult('balanceBNBResult', 'Error checking BNB balance: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  async function checkHistory() {
-    const address = document.getElementById('historyAddress').value;
-    const button = document.getElementById('checkHistoryBtn');
-    const loader = document.getElementById('checkHistoryLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/history/sepolia?address=${address}`);
-      const result = await response.json();
-      showResult('historyResult', 'History: ' + JSON.stringify(result), true);
-    } catch (error) {
-      showResult('historyResult', 'Error checking history: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  async function checkBurntAmount() {
-    const address = document.getElementById('burnAddress').value;
-    const tokenAddress = document.getElementById('tokenAddress').value;
-    const button = document.getElementById('checkBurntAmountBtn');
-    const loader = document.getElementById('checkBurntAmountLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/burntAmountOf?address=${address}&tokenAddress=${tokenAddress}`);
-      const result = await response.json();
-      showResult('burnResult', 'Burnt Amount: ' + JSON.stringify(result), true);
-    } catch (error) {
-      showResult('burnResult', 'Error checking burnt amount: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  async function processBlockConfirmationSepolia() {
-    const button = document.getElementById('processBlockConfirmationSepoliaBtn');
-    const loader = document.getElementById('processBlockConfirmationSepoliaLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/scheduler/confirm/sepolia`);
-      const result = await response.json();
-      showResult('blockConfirmationSepoliaStatus', 'Process completed: ' + JSON.stringify(result), true);
-    } catch (error) {
-      showResult('blockConfirmationSepoliaStatus', 'Error processing block confirmation: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  async function processBlockConfirmationBNB() {
-    const button = document.getElementById('processBlockConfirmationBNBBtn');
-    const loader = document.getElementById('processBlockConfirmationBNBLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/scheduler/confirm/bnb`);
-      const result = await response.json();
-      showResult('blockConfirmationBNBStatus', 'Process completed: ' + JSON.stringify(result), true);
-    } catch (error) {
-      showResult('blockConfirmationBNBStatus', 'Error processing block confirmation: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  async function processBurntMonitor() {
-    const button = document.getElementById('burntMonitorBtn');
-    const loader = document.getElementById('burntMonitorLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const response = await fetch(`/api/scheduler/monitoring`);
-      const result = await response.json();
-      showResult('burntMonitorStatus', 'Process completed: ' + JSON.stringify(result), true);
-    } catch (error) {
-      showResult('burntMonitorStatus', 'Error processing burntMonitorStatus: ' + error.message, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-  function showResult(elementId, message, success) {
-    const statusElement = document.getElementById(elementId);
-    statusElement.style.display = 'block';
-    statusElement.textContent = message;
-    statusElement.className = 'status ' + (success ? 'success' : 'error');
-  }
-  async function connectMetaMask() {
-    if (window.ethereum) {
-      try {
-        // 사용자에게 계정 연결을 요청합니다.
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
-        console.log('Connected account:', accounts[0]);
-        return accounts[0];
-      } catch (error) {
-        console.error('User denied account access', error);
-        throw error;
-      }
-    } else {
-      alert('MetaMask is not installed. Please install it to use this feature.');
-      throw new Error('MetaMask not installed');
-    }
-  }
-
-  // 토큰을 소각하는 함수
-  async function burnTokens() {
-    const account = await connectMetaMask(); // MetaMask 연결
-    const tokenContractAddress = document.getElementById('tokenContractAddress').value;
-    const button = document.getElementById('burnTokensBtn');
-    const loader = document.getElementById('burnTokensLoader');
-
-    button.disabled = true;
-    loader.style.display = 'inline-block';
-
-    try {
-      const web3 = new Web3(window.ethereum);
-
-      tokenABI = [{"inputs":[{"internalType":"string","name":"name_","type":"string"},{"internalType":"string","name":"symbol_","type":"string"},{"internalType":"uint8","name":"decimal_","type":"uint8"}],"stateMutability":"nonpayable","type":"constructor"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"OwnableInvalidOwner","type":"error"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"OwnableUnauthorizedAccount","type":"error"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"spender","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Approval","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"previousOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnershipTransferred","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"from","type":"address"},{"indexed":true,"internalType":"address","name":"to","type":"address"},{"indexed":false,"internalType":"uint256","name":"value","type":"uint256"}],"name":"Transfer","type":"event"},{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"burn","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"burntAmountOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"mint","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"renounceOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"totalSupply","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"sender","type":"address"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"newOwner","type":"address"}],"name":"transferOwnership","outputs":[],"stateMutability":"nonpayable","type":"function"}]
-      const tokenContract = new web3.eth.Contract(tokenABI, tokenContractAddress);
-
-      // 소각 트랜잭션 생성 및 전송
-      tokenContract.methods.burn(500).send({from: account});
-    } catch (error) {
-      showResult('burnTokensStatus', `Error burning tokens: ${error.message}`, false);
-    } finally {
-      button.disabled = false;
-      loader.style.display = 'none';
-    }
-  }
-
-</script>
 </div>
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const odinGrid = document.getElementById('odinGrid');
+    const heimdallGrid = document.getElementById('heimdallGrid');
+    const tooltip = document.getElementById('tooltip');
+
+    function createStatusGrid(gridElement) {
+      const now = new Date();
+      for (let day = 0; day < 30; day++) {
+        const dayColumn = document.createElement('div');
+        dayColumn.className = 'day-column';
+
+        for (let timeSlot = 0; timeSlot < 3; timeSlot++) {
+          const statusCell = document.createElement('div');
+          statusCell.className = 'status-cell';
+          statusCell.id = `${gridElement.id}-cell-${day}-${timeSlot}`;
+
+          const cellDate = new Date(now);
+          cellDate.setDate(cellDate.getDate() - day);
+          cellDate.setHours(timeSlot * 8, 0, 0, 0);
+          const cellEndDate = new Date(cellDate);
+          cellEndDate.setHours(cellDate.getHours() + 8);
+
+          const koreanStart = new Date(cellDate.getTime());
+          const koreanEnd = new Date(cellEndDate.getTime());
+
+          statusCell.setAttribute('data-start', formatDate(koreanStart));
+          statusCell.setAttribute('data-end', formatDate(koreanEnd));
+
+          statusCell.addEventListener('mouseover', showTooltip);
+          statusCell.addEventListener('mouseout', hideTooltip);
+
+          dayColumn.appendChild(statusCell);
+        }
+
+        gridElement.appendChild(dayColumn);
+      }
+    }
+
+    function updateStatusCells(statusData) {
+      const now = new Date(); // 현재 시간을 로컬 타임존으로 가져옴
+      const nowUTC = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
+
+      for (const [groupName, data] of Object.entries(statusData)) {
+        const gridElement = groupName === 'odin' ? odinGrid : heimdallGrid;
+
+        data.forEach(status => {
+          const statusDate = new Date(status.timeStamp);
+          const statusKST = new Date(statusDate.getTime() + now.getTimezoneOffset() * 60000);
+
+          const hours = statusKST.getHours();
+
+          // 시간대를 8시간 단위로 나누어 timeSlot 계산
+          const timeSlot = Math.floor(hours / 8);
+          // 현재 날짜(now)와 statusDate(KST)의 차이를 일 단위로 계산
+          const dayDiff = Math.floor((nowUTC - statusDate) / (1000 * 60 * 60 * 24));
+          console.log(nowUTC.getDay(), statusKST.getDay(), status, dayDiff, timeSlot);
+          // 30일 범위 내의 유효한 날짜만 처리
+          if (dayDiff >= 0 && dayDiff < 30) {
+            const cellId = `${gridElement.id}-cell-${dayDiff + 1}-${timeSlot}`; // 해당 셀 ID 생성
+            const cell = document.getElementById(cellId);
+
+            if (cell && status.active === "false") {
+              cell.classList.add('error'); // 상태가 "false"라면 'error' 클래스를 추가
+            }
+          }
+        });
+      }
+    }
+
+    function showTooltip(event) {
+      const cell = event.target;
+      const startTime = new Date(cell.getAttribute('data-start'));
+      const endTime = new Date(cell.getAttribute('data-end'));
+      const formattedStart = formatDate(startTime);
+      const formattedEnd = formatDate(endTime);
+
+      tooltip.innerHTML = `Time range: ${formattedStart} - ${formattedEnd} (KST)`;
+      tooltip.style.display = 'block';
+      tooltip.style.left = `${event.pageX + 10}px`;
+      tooltip.style.top = `${event.pageY + 10}px`;
+    }
+
+    function formatDate(date) {
+      return date.toLocaleString('ko-KR', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+        timeZone: 'Asia/Seoul' // KST 기준으로 출력
+      });
+    }
+
+    function hideTooltip() {
+      tooltip.style.display = 'none';
+    }
+
+    createStatusGrid(odinGrid);
+    createStatusGrid(heimdallGrid);
+
+    // Simulating API call with the provided data structure
+    fetch('/api/status')
+            .then(response => response.json())
+            .then(data => {
+              updateStatusCells(data);
+            })
+            .catch(error => console.error('Error fetching status data:', error));
+
+  });
+</script>
 </body>
 </html>
