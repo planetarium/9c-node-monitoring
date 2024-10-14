@@ -3,15 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Node Health Status (Last 30 Days)</title>
+  <title>Node Health Status Dashboard</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
       margin: 0;
+      padding: 20px;
       background-color: #f0f0f0;
     }
     .container {
@@ -20,7 +17,7 @@
       padding: 20px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     }
-    h1 {
+    h1, h2 {
       text-align: center;
       color: #333;
     }
@@ -28,6 +25,7 @@
       display: flex;
       justify-content: center;
       gap: 20px;
+      margin-bottom: 30px;
     }
     .grid-container {
       display: flex;
@@ -64,11 +62,31 @@
       font-weight: bold;
       margin-bottom: 5px;
     }
+    #detailView {
+      display: none;
+      margin-top: 30px;
+    }
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(24, 1fr);
+      gap: 2px;
+      margin-bottom: 10px;
+    }
+    .detail-cell {
+      width: 20px;
+      height: 20px;
+      background-color: #00ff00;
+      border-radius: 3px;
+    }
+    .detail-label {
+      font-weight: bold;
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 <body>
 <div class="container">
-  <h1>Node Health Status (Last 30 Days)</h1>
+  <h1>Node Health Status Dashboard</h1>
   <div class="grid-wrapper">
     <div>
       <div class="grid-label">Odin</div>
@@ -79,8 +97,13 @@
       <div id="heimdallGrid" class="grid-container"></div>
     </div>
   </div>
+  <div id="detailView">
+    <h2>Detailed View</h2>
+    <div id="detailGrids"></div>
+  </div>
 </div>
 <div id="tooltip" class="tooltip"></div>
+
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
@@ -97,22 +120,22 @@
         for (let timeSlot = 0; timeSlot < 3; timeSlot++) {
           const statusCell = document.createElement('div');
           statusCell.className = 'status-cell';
-          statusCell.id = `${gridElement.id}-cell-${day}-${timeSlot}`;
 
-          const cellDate = new Date(now);
-          cellDate.setDate(cellDate.getDate() - day);
-          cellDate.setHours(timeSlot * 8, 0, 0, 0);
-          const cellEndDate = new Date(cellDate);
-          cellEndDate.setHours(cellDate.getHours() + 8);
+          const date = new Date(now);
+          date.setDate(date.getDate() - day);
+          const dateStr = date.toISOString().split('T')[0];
 
-          const koreanStart = new Date(cellDate.getTime());
-          const koreanEnd = new Date(cellEndDate.getTime());
+          const startHour = timeSlot * 8;
+          const endHour = startHour + 8;
 
-          statusCell.setAttribute('data-start', formatDate(koreanStart));
-          statusCell.setAttribute('data-end', formatDate(koreanEnd));
+          statusCell.id = `${gridElement.id}-cell-${dateStr}-${timeSlot}`;
+          statusCell.setAttribute('data-start', `${dateStr} ${String(startHour).padStart(2, '0')}:00:00`);
+          statusCell.setAttribute('data-end', `${dateStr} ${String(endHour).padStart(2, '0')}:00:00`);
+          statusCell.setAttribute('data-group', gridElement.id === 'odinGrid' ? 'odin' : 'heimdall');
 
           statusCell.addEventListener('mouseover', showTooltip);
           statusCell.addEventListener('mouseout', hideTooltip);
+          statusCell.addEventListener('click', showDetailView);
 
           dayColumn.appendChild(statusCell);
         }
@@ -122,31 +145,19 @@
     }
 
     function updateStatusCells(statusData) {
-      const now = new Date(); // 현재 시간을 로컬 타임존으로 가져옴
-      const nowUTC = new Date(now.getTime() + now.getTimezoneOffset() * 60000);
-
       for (const [groupName, data] of Object.entries(statusData)) {
         const gridElement = groupName === 'odin' ? odinGrid : heimdallGrid;
 
         data.forEach(status => {
-          const statusDate = new Date(status.timeStamp);
-          const statusKST = new Date(statusDate.getTime() + now.getTimezoneOffset() * 60000);
+          const [dateStr, timeStr] = status.timeStamp.split('T');
+          const hour = parseInt(timeStr.split(':')[0]);
+          const timeSlot = Math.floor(hour / 8);
 
-          const hours = statusKST.getHours();
+          const cellId = `${gridElement.id}-cell-${dateStr}-${timeSlot}`;
+          const cell = document.getElementById(cellId);
 
-          // 시간대를 8시간 단위로 나누어 timeSlot 계산
-          const timeSlot = Math.floor(hours / 8);
-          // 현재 날짜(now)와 statusDate(KST)의 차이를 일 단위로 계산
-          const dayDiff = Math.floor((nowUTC - statusDate) / (1000 * 60 * 60 * 24));
-          console.log(nowUTC.getDay(), statusKST.getDay(), status, dayDiff, timeSlot);
-          // 30일 범위 내의 유효한 날짜만 처리
-          if (dayDiff >= 0 && dayDiff < 30) {
-            const cellId = `${gridElement.id}-cell-${dayDiff + 1}-${timeSlot}`; // 해당 셀 ID 생성
-            const cell = document.getElementById(cellId);
-
-            if (cell && status.active === "false") {
-              cell.classList.add('error'); // 상태가 "false"라면 'error' 클래스를 추가
-            }
+          if (cell && status.active === "false") {
+            cell.classList.add('error');
           }
         });
       }
@@ -154,44 +165,77 @@
 
     function showTooltip(event) {
       const cell = event.target;
-      const startTime = new Date(cell.getAttribute('data-start'));
-      const endTime = new Date(cell.getAttribute('data-end'));
-      const formattedStart = formatDate(startTime);
-      const formattedEnd = formatDate(endTime);
+      const startTime = cell.getAttribute('data-start');
+      const endTime = cell.getAttribute('data-end');
 
-      tooltip.innerHTML = `Time range: ${formattedStart} - ${formattedEnd} (KST)`;
+      tooltip.innerHTML = `Time range: ${startTime} - ${endTime} (KST)`;
       tooltip.style.display = 'block';
       tooltip.style.left = `${event.pageX + 10}px`;
       tooltip.style.top = `${event.pageY + 10}px`;
-    }
-
-    function formatDate(date) {
-      return date.toLocaleString('ko-KR', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false,
-        timeZone: 'Asia/Seoul' // KST 기준으로 출력
-      });
     }
 
     function hideTooltip() {
       tooltip.style.display = 'none';
     }
 
+    function showDetailView(event) {
+      const cell = event.target;
+      const startDate = new Date(cell.getAttribute('data-start'));
+      const group = cell.getAttribute('data-group');
+
+      const formattedStartDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
+      const formattedEndDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate() + 1).padStart(2, '0')}`;
+
+      fetch(`/api/status/detail?group=${group}&start=${formattedStartDate}&end=${formattedEndDate}`)
+              .then(response => response.json())
+              .then(data => {
+                detailGrids.innerHTML = '';
+                for (const [endpointUrl, statusList] of Object.entries(data)) {
+                  const detailGrid = createDetailGrid(endpointUrl, statusList);
+                  detailGrids.appendChild(detailGrid);
+                }
+                detailView.style.display = 'block';
+              })
+              .catch(error => console.error('Error fetching detail data:', error));
+    }
+
+    function createDetailGrid(endpointUrl, statusList) {
+      const gridContainer = document.createElement('div');
+      gridContainer.innerHTML = `<div class="detail-label">${endpointUrl}</div>`;
+      const grid = document.createElement('div');
+      grid.className = 'detail-grid';
+
+      for (let hour = 0; hour < 24; hour++) {
+        const cell = document.createElement('div');
+        cell.className = 'detail-cell';
+        const cellTime = new Date(statusList[0].timeStamp);
+        cellTime.setHours(hour, 0, 0, 0);
+
+        const status = statusList.find(s => {
+          const statusTime = new Date(s.timeStamp);
+          return statusTime.getHours() === hour;
+        });
+
+        if (status && status.active === "false") {
+          cell.style.backgroundColor = '#ff0000';
+        }
+
+        grid.appendChild(cell);
+      }
+
+      gridContainer.appendChild(grid);
+      return gridContainer;
+    }
+
     createStatusGrid(odinGrid);
     createStatusGrid(heimdallGrid);
 
-    // Simulating API call with the provided data structure
     fetch('/api/status')
             .then(response => response.json())
             .then(data => {
               updateStatusCells(data);
             })
             .catch(error => console.error('Error fetching status data:', error));
-
   });
 </script>
 </body>

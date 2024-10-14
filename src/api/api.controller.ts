@@ -36,5 +36,21 @@ export class ApiController {
     return await this.nodeHealthService.getStatus();
   }
 
+  @Get(`/status/detail`)
+  async getDetail(@Query("group") group: string, @Query("start") startTimeStamp: string, @Query("end") endTimeStamp: string) {
+    let details = await this.nodeHealthService.getDetail(group, startTimeStamp, endTimeStamp);
+    console.log(group, startTimeStamp, endTimeStamp, details);
+    const groupedData = details.reduce((acc, item) => {
+      const endpoint = item.endpoint_url;
+      if (!acc[endpoint]) {
+        acc[endpoint] = [];
+      }
+      acc[endpoint].push(item);
+      return acc;
+    }, {});
+
+    return groupedData;
+  }
+
 
 }

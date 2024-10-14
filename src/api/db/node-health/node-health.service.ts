@@ -1,7 +1,7 @@
 import { NodeHealthRepository } from "./node-health.repository";
 import { Injectable } from "@nestjs/common";
 import {NodeHealth} from "./node-health";
-import { Not, In, MoreThanOrEqual} from "typeorm"
+import { Not, Between, In, MoreThanOrEqual} from "typeorm"
 
 @Injectable()
 export class NodeHealthService {
@@ -45,6 +45,21 @@ export class NodeHealthService {
         });
 
     return { "odin": odinNodes, "heimdall": heimdallNodes };
+  }
+
+  async getDetail(group: string, startTimeStamp: string, endTimeStamp: string) {
+    const startDate = new Date(startTimeStamp);
+    const endDate = new Date(endTimeStamp);
+    startDate.setTime(startDate.getTime() - (9 * 60 * 60 * 1000)) // timestamp 때문에 이렇게 조회해야함. 나중에 수정하자. TODO
+    endDate.setTime(endDate.getTime() - (9 * 60 * 60 * 1000));
+    let nodeHealths = await this.nodeHealthRepository.find({
+      where: {
+        timeStamp: Between(startDate , endDate),
+        active: "false",
+        group_name: group //순서 고려해보자 인덱스
+      }
+    });
+    return nodeHealths;
   }
 
   async getPendingTransactions() {
