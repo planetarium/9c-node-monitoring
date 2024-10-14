@@ -10,11 +10,14 @@
     :root {
       --primary-color: #3498db;
       --success-color: #2ecc71;
-      --error-color: #e74c3c;
+      --warning-color: #f1c40f;
+      --error-light-color: #e74c3c;
+      --error-color: #c0392b;
       --background-color: #f8f9fa;
       --card-background: #ffffff;
       --text-color: #2c3e50;
-      --border-radius: 12px;
+      --border-radius: 20px; /* 둥글게 */
+      --box-shadow-color: rgba(0, 0, 0, 0.1);
     }
 
     body {
@@ -34,6 +37,20 @@
     h1, h2, h3 {
       text-align: center;
       margin-bottom: 2rem;
+      font-weight: 700;
+      color: var(--primary-color); /* 화려한 색상 */
+    }
+
+    h1 {
+      font-size: 2.5rem; /* 더 큰 타이틀 폰트 */
+    }
+
+    h2 {
+      font-size: 2rem;
+    }
+
+    h3 {
+      font-size: 1.5rem;
     }
 
     .status-grid {
@@ -50,26 +67,29 @@
     .status-card {
       background-color: var(--card-background);
       border-radius: var(--border-radius);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      padding: 1.5rem;
+      box-shadow: 0 8px 12px var(--box-shadow-color);
+      padding: 2rem; /* 더 넉넉한 패딩 */
       margin-bottom: 2rem;
-      transition: transform 0.3s ease;
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
     .status-card:hover {
-      transform: translateY(-5px);
+      transform: translateY(-10px); /* 더 강조된 hover 효과 */
+      box-shadow: 0 12px 18px rgba(0, 0, 0, 0.2);
     }
 
     .status-card h3 {
       margin-top: 0;
       margin-bottom: 1rem;
-      font-size: 1.2rem;
+      font-size: 1.4rem;
+      color: var(--text-color);
+      text-align: center;
     }
 
     .status-cells {
       display: grid;
       grid-template-columns: repeat(30, 1fr);
-      gap: 4px;
+      gap: 6px;
     }
 
     .status-cell {
@@ -80,6 +100,12 @@
       transition: all 0.3s ease;
     }
 
+    .status-cell.warning {
+      background-color: var(--warning-color);
+    }
+    .status-cell.error-light {
+      background-color: var(--error-light-color);
+    }
     .status-cell.error {
       background-color: var(--error-color);
     }
@@ -92,9 +118,17 @@
     .detailed-view {
       background-color: var(--card-background);
       border-radius: var(--border-radius);
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      box-shadow: 0 8px 12px var(--box-shadow-color);
       padding: 2rem;
       margin-top: 3rem;
+      transition: all 0.3s ease;
+    }
+
+    .detailed-view h2 {
+      color: var(--primary-color);
+      font-size: 2rem;
+      text-align: center;
+      margin-bottom: 1.5rem;
     }
 
     .detail-grid {
@@ -121,18 +155,26 @@
       box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     }
 
+    #date {
+      color: var(--warning-color);
+      font-size: 1.3rem; /* 날짜 표시를 더 강조 */
+      text-align: center;
+      margin-bottom: 1.5rem;
+    }
+
+    /* tooltip 효과 */
     .tooltip {
       position: absolute;
       background-color: rgba(44, 62, 80, 0.9);
       color: #ecf0f1;
-      padding: 0.5rem 1rem;
+      padding: 0.75rem 1.25rem; /* 더 넓은 padding */
       border-radius: var(--border-radius);
       font-size: 0.875rem;
       z-index: 100;
       display: none;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
       animation: fadeIn 0.3s ease;
     }
-
     @keyframes fadeIn {
       from { opacity: 0; }
       to { opacity: 1; }
@@ -140,14 +182,14 @@
 
     .hour-label {
       text-align: center;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       color: #7f8c8d;
-      margin-bottom: 0.25rem;
+      margin-bottom: 0.5rem; /* 여유 공간 */
     }
 
     .endpoint-label {
       font-weight: 600;
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.75rem; /* 여유 공간 */
       color: var(--primary-color);
     }
   </style>
@@ -170,8 +212,7 @@
     </div>
   </div>
   <div id="detailView" class="detailed-view" style="display: none;">
-    <h2>Detailed View</h2>
-    <h3 id="date"></h3>
+    <h2 id="date"></h2>
     <div id="detailGrids"></div>
   </div>
 </div>
@@ -179,6 +220,7 @@
 
 <script>
   let endpointUrls; // 내부 변수 선언
+  let cellInactiveCount = new Map();
 
   function createAnimatedCell(className) {
     const cell = document.createElement('div');
@@ -235,7 +277,18 @@
           statusCell.setAttribute('data-start', `${dateStr} ${String(startHour).padStart(2, '0')}:00:00`);
           statusCell.setAttribute('data-end', `${dateStr} ${String(endHour).padStart(2, '0')}:00:00`);
           statusCell.setAttribute('data-group', gridElement.id === 'odinGrid' ? 'odin' : 'heimdall');
-
+          statusCell.setAttribute('data-tooltip', formatDate(dateStr))
+          function formatDate(date) {
+            return date.toLocaleString('ko-KR', {
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: false,
+              timeZone: 'Asia/Seoul' // KST 기준으로 출력
+            });
+          }
           statusCell.addEventListener('mouseover', showTooltip);
           statusCell.addEventListener('mouseout', hideTooltip);
           statusCell.addEventListener('click', showDetailView);
@@ -245,6 +298,19 @@
 
         gridElement.appendChild(dayColumn);
       }
+    }
+
+    function showMainTooltip(event) {
+      const cell = event.target;
+      const startTime = new Date(cell.getAttribute('data-start'));
+      const endTime = new Date(cell.getAttribute('data-end'));
+      const formattedStart = formatDate(startTime);
+      const formattedEnd = formatDate(endTime);
+
+      tooltip.innerHTML = `Time range: ${formattedStart} - ${formattedEnd} (KST)`;
+      tooltip.style.display = 'block';
+      tooltip.style.left = `${event.pageX + 10}px`;
+      tooltip.style.top = `${event.pageY + 10}px`;
     }
 
     function updateStatusCells(statusData) {
@@ -259,22 +325,52 @@
           const cellId = `${gridElement.id}-cell-${dateStr}-${timeSlot}`;
           const cell = document.getElementById(cellId);
 
-          if (cell && status.active === "false") {
-            cell.classList.add('error');
+          if (!cellInactiveCount.has(cellId)) {
+            cellInactiveCount.set(cellId, { count: 0, statuses: [] });
+          }
+
+          if (status.active === "false") {
+            const cellData = cellInactiveCount.get(cellId);
+            cellData.count += 1;
+            cellData.statuses.push(status);
+            cellInactiveCount.set(cellId, cellData);
           }
         });
       }
+
+      cellInactiveCount.forEach((data, cellId) => {
+        const cell = document.getElementById(cellId);
+        if (cell) {
+          if (data.count === 1) {
+            cell.className = 'status-cell warning';
+          } else if (data.count === 2) {
+            cell.className = 'status-cell error-light';
+          } else if (data.count > 2) {
+            cell.className = 'status-cell error';
+          } else {
+            cell.className = 'status-cell';
+          }
+
+          // 툴팁 내용 업데이트
+          const tooltipContent = data.statuses
+                  .map(s => `Time: ${s.timeStamp}<br>TxHash: ${s.txHash}<br>Log: ${s.log}`)
+                  .join('<br><br>');
+
+          cell.setAttribute('data-tooltip', tooltipContent);
+        }
+      });
     }
 
     function showTooltip(event) {
       const cell = event.target;
-      const startTime = cell.getAttribute('data-start');
-      const endTime = cell.getAttribute('data-end');
+      const tooltipContent = cell.getAttribute('data-tooltip');
 
-      tooltip.innerHTML = `Time range: ${startTime} - ${endTime} (KST)`;
-      tooltip.style.display = 'block';
-      tooltip.style.left = `${event.pageX + 10}px`;
-      tooltip.style.top = `${event.pageY + 10}px`;
+      if (tooltipContent) {
+        tooltip.innerHTML = tooltipContent;
+        tooltip.style.display = 'block';
+        tooltip.style.left = `${event.pageX + 10}px`;
+        tooltip.style.top = `${event.pageY + 10}px`;
+      }
     }
 
     function hideTooltip() {
@@ -292,7 +388,7 @@
       fetch(`/api/status/detail?group=${group}&start=${formattedStartDate}&end=${formattedEndDate}`)
               .then(response => response.json())
               .then(data => {
-                document.getElementById("date").innerHTML = `${formattedStartDate}일 ~ ${formattedEndDate}일`;
+                document.getElementById("date").innerHTML = `${formattedStartDate}일`;
                 detailGrids.innerHTML = '';
                 let restUrlEndpoints = endpointUrls;
                 if (group === 'odin')
@@ -302,7 +398,7 @@
 
 
                 if (Object.keys(data).length === 0) {
-                  const emptyGrid = createDetailGrid('ALL', [])
+                  const emptyGrid = createDetailGrid('전체', [])
                   detailGrids.appendChild(emptyGrid);
                 } else {
                   for (const [endpointUrl, statusList] of Object.entries(data)) {
@@ -337,8 +433,6 @@
 
       for (let hour = 0; hour < 24; hour++) {
         const cell = createAnimatedCell('detail-cell');
-
-
         const currentStatus = statusList.find(status => new Date(status.timeStamp).getHours() === hour);
 
         if (currentStatus && currentStatus.active === "false") {
