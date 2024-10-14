@@ -190,10 +190,17 @@
               .then(response => response.json())
               .then(data => {
                 detailGrids.innerHTML = '';
-                for (const [endpointUrl, statusList] of Object.entries(data)) {
-                  const detailGrid = createDetailGrid(endpointUrl, statusList);
-                  detailGrids.appendChild(detailGrid);
+
+                if (Object.keys(data).length === 0) {
+                  const emptyGrid = createDetailGrid('ALL', [])
+                  detailGrids.appendChild(emptyGrid);
+                } else {
+                  for (const [endpointUrl, statusList] of Object.entries(data)) {
+                    const detailGrid = createDetailGrid(endpointUrl, statusList);
+                    detailGrids.appendChild(detailGrid);
+                  }
                 }
+
                 detailView.style.display = 'block';
               })
               .catch(error => console.error('Error fetching detail data:', error));
@@ -208,16 +215,18 @@
       for (let hour = 0; hour < 24; hour++) {
         const cell = document.createElement('div');
         cell.className = 'detail-cell';
-        const cellTime = new Date(statusList[0].timeStamp);
-        cellTime.setHours(hour, 0, 0, 0);
+        if(statusList.length > 0) {
+          const cellTime = new Date(statusList[0].timeStamp);
+          cellTime.setHours(hour, 0, 0, 0);
 
-        const status = statusList.find(s => {
-          const statusTime = new Date(s.timeStamp);
-          return statusTime.getHours() === hour;
-        });
+          const status = statusList.find(s => {
+            const statusTime = new Date(s.timeStamp);
+            return statusTime.getHours() === hour;
+          });
 
-        if (status && status.active === "false") {
-          cell.style.backgroundColor = '#ff0000';
+          if (status && status.active === "false") {
+            cell.style.backgroundColor = '#ff0000';
+          }
         }
 
         grid.appendChild(cell);
