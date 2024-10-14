@@ -5,118 +5,171 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Node Health Status Dashboard</title>
   <style>
-    body {
-      font-family: 'Helvetica Neue', sans-serif;
-      margin: 0;
-      padding: 20px;
-      background-color: #f7f9fc;
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+    :root {
+      --primary-color: #3498db;
+      --success-color: #2ecc71;
+      --error-color: #e74c3c;
+      --background-color: #f8f9fa;
+      --card-background: #ffffff;
+      --text-color: #2c3e50;
+      --border-radius: 12px;
     }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: var(--background-color);
+      color: var(--text-color);
+    }
+
     .container {
-      background: #ffffff;
-      border-radius: 20px;
-      padding: 30px;
-      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
       max-width: 1200px;
       margin: 0 auto;
+      padding: 2rem;
     }
-    h1, h2 {
+
+    h1, h2, h3 {
       text-align: center;
-      color: #2c3e50;
+      margin-bottom: 2rem;
     }
-    .grid-wrapper {
+
+    .status-grid {
       display: flex;
-      justify-content: space-around;
-      gap: 40px;
-      margin-bottom: 30px;
+      justify-content: space-between;
+      margin-bottom: 3rem;
     }
-    .grid-container {
-      display: flex;
-      flex-direction: row-reverse;
+
+    .status-column {
+      flex: 1;
+      margin: 0 1rem;
+    }
+
+    .status-card {
+      background-color: var(--card-background);
+      border-radius: var(--border-radius);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+      transition: transform 0.3s ease;
+    }
+
+    .status-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .status-card h3 {
+      margin-top: 0;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+
+    .status-cells {
+      display: grid;
+      grid-template-columns: repeat(30, 1fr);
       gap: 4px;
     }
-    .day-column {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+
     .status-cell {
-      width: 18px;
-      height: 18px;
-      background-color: #00b894;
-      border-radius: 5px;
-      cursor: pointer;
-      transition: transform 0.1s ease;
+      width: 100%;
+      padding-bottom: 100%;
+      border-radius: 4px;
+      background-color: var(--success-color);
+      transition: all 0.3s ease;
     }
+
+    .status-cell.error {
+      background-color: var(--error-color);
+    }
+
     .status-cell:hover {
-      transform: scale(1.1);
+      transform: scale(1.2);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
     }
-    .error {
-      background-color: #e74c3c;
+
+    .detailed-view {
+      background-color: var(--card-background);
+      border-radius: var(--border-radius);
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      padding: 2rem;
+      margin-top: 3rem;
     }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: repeat(24, 1fr);
+      gap: 8px;
+      margin-bottom: 2rem;
+    }
+
+    .detail-cell {
+      width: 100%;
+      padding-bottom: 100%;
+      border-radius: 4px;
+      background-color: var(--success-color);
+      transition: all 0.3s ease;
+    }
+
+    .detail-cell.error {
+      background-color: var(--error-color);
+    }
+
+    .detail-cell:hover {
+      transform: scale(1.2);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    }
+
     .tooltip {
       position: absolute;
       background-color: rgba(44, 62, 80, 0.9);
       color: #ecf0f1;
-      padding: 8px;
-      border-radius: 5px;
-      font-size: 12px;
+      padding: 0.5rem 1rem;
+      border-radius: var(--border-radius);
+      font-size: 0.875rem;
       z-index: 100;
       display: none;
+      animation: fadeIn 0.3s ease;
     }
-    .grid-label {
-      text-align: center;
-      font-weight: bold;
-      margin-bottom: 10px;
-      color: #34495e;
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
     }
-    #detailView {
-      display: none;
-      margin-top: 40px;
-    }
-    .detail-grid {
-      display: grid;
-      grid-template-columns: repeat(24, 1fr);
-      gap: 4px;
-      margin-bottom: 10px;
-      position: relative;
-    }
-    .detail-cell {
-      width: 30px;
-      height: 30px;
-      background-color: #00b894;
-      border-radius: 6px;
-      cursor: pointer;
-    }
-    .detail-cell.error {
-      background-color: #e74c3c;
-    }
-    .detail-label {
-      font-weight: bold;
-      margin-bottom: 10px;
-      color: #2c3e50;
-    }
+
     .hour-label {
       text-align: center;
-      font-size: 12px;
-      font-weight: bold;
-      color: #34495e;
+      font-size: 0.75rem;
+      color: #7f8c8d;
+      margin-bottom: 0.25rem;
+    }
+
+    .endpoint-label {
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+      color: var(--primary-color);
     }
   </style>
 </head>
 <body>
 <div class="container">
   <h1>Node Health Status Dashboard</h1>
-  <div class="grid-wrapper">
-    <div>
-      <div class="grid-label">Odin</div>
-      <div id="odinGrid" class="grid-container"></div>
+  <div class="status-grid">
+    <div class="status-column">
+      <div class="status-card">
+        <h3>Odin</h3>
+        <div id="odinGrid" class="status-cells"></div>
+      </div>
     </div>
-    <div>
-      <div class="grid-label">Heimdall</div>
-      <div id="heimdallGrid" class="grid-container"></div>
+    <div class="status-column">
+      <div class="status-card">
+        <h3>Heimdall</h3>
+        <div id="heimdallGrid" class="status-cells"></div>
+      </div>
     </div>
   </div>
-  <div id="detailView">
+  <div id="detailView" class="detailed-view" style="display: none;">
     <h2>Detailed View</h2>
     <h3 id="date"></h3>
     <div id="detailGrids"></div>
@@ -126,6 +179,20 @@
 
 <script>
   let endpointUrls; // 내부 변수 선언
+
+  function createAnimatedCell(className) {
+    const cell = document.createElement('div');
+    cell.className = className;
+    cell.style.transform = 'scale(0)';
+    cell.style.opacity = '0';
+
+    setTimeout(() => {
+      cell.style.transform = 'scale(1)';
+      cell.style.opacity = '1';
+    }, Math.random() * 500);
+
+    return cell;
+  }
 
   async function fetchDistinctEndpoints() {
     try {
@@ -155,8 +222,7 @@
         dayColumn.className = 'day-column';
 
         for (let timeSlot = 0; timeSlot < 3; timeSlot++) {
-          const statusCell = document.createElement('div');
-          statusCell.className = 'status-cell';
+          const statusCell = createAnimatedCell('status-cell');
 
           const date = new Date(now);
           date.setDate(date.getDate() - day);
@@ -240,7 +306,7 @@
                   detailGrids.appendChild(emptyGrid);
                 } else {
                   for (const [endpointUrl, statusList] of Object.entries(data)) {
-                    restUrlEndpoints = restUrlEndpoints.filter(url => url !== endpointUrl); // 표시 안 해준 endpoint 보여주기 위해.
+                    restUrlEndpoints = restUrlEndpoints.filter(url => url !== endpointUrl);
                     const detailGrid = createDetailGrid(endpointUrl, statusList);
                     detailGrids.appendChild(detailGrid);
                   }
@@ -270,8 +336,8 @@
       }
 
       for (let hour = 0; hour < 24; hour++) {
-        const cell = document.createElement('div');
-        cell.className = 'detail-cell';
+        const cell = createAnimatedCell('detail-cell');
+
 
         const currentStatus = statusList.find(status => new Date(status.timeStamp).getHours() === hour);
 

@@ -26,11 +26,6 @@ export class ApiController {
     this.apiService.resolvePendingTransactions();
   }
 
-  // @Get('/temp')
-  // async temp() {
-  //   await this.apiService.tempSend('odin');
-  // }
-
   @Get('/status')
   async getStatus() {
     return await this.nodeHealthService.getStatus();
@@ -47,7 +42,6 @@ export class ApiController {
       acc[endpoint].push(item);
       return acc;
     }, {});
-    console.log(groupedData);
 
     return groupedData;
   }
