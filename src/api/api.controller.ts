@@ -39,7 +39,6 @@ export class ApiController {
   @Get(`/status/detail`)
   async getDetail(@Query("group") group: string, @Query("start") startTimeStamp: string, @Query("end") endTimeStamp: string) {
     let details = await this.nodeHealthService.getDetail(group, startTimeStamp, endTimeStamp);
-    console.log(group, startTimeStamp, endTimeStamp, details);
     const groupedData = details.reduce((acc, item) => {
       const endpoint = item.endpoint_url;
       if (!acc[endpoint]) {
@@ -48,8 +47,20 @@ export class ApiController {
       acc[endpoint].push(item);
       return acc;
     }, {});
+    console.log(groupedData);
 
     return groupedData;
+  }
+
+  @Get('/distinct-endpoints')
+  async getDistinctEndpoints() {
+    let endpoints = await this.nodeHealthService.getDistinctEndpoints();
+    let distinguishEndpoints = {};
+    const odinURL = endpoints.filter(url => !url.includes('heimdall'));
+    const heimdallURL = endpoints.filter(url => url.includes('heimdall'));
+    distinguishEndpoints['odin'] = odinURL;
+    distinguishEndpoints['heimdall'] = heimdallURL;
+    return distinguishEndpoints;
   }
 
 

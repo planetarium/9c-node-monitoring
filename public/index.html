@@ -6,53 +6,59 @@
   <title>Node Health Status Dashboard</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
+      font-family: 'Helvetica Neue', sans-serif;
       margin: 0;
       padding: 20px;
-      background-color: #f0f0f0;
+      background-color: #f7f9fc;
     }
     .container {
-      background: #E2EDFF;
-      border-radius: 30px;
-      padding: 20px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      background: #ffffff;
+      border-radius: 20px;
+      padding: 30px;
+      box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+      max-width: 1200px;
+      margin: 0 auto;
     }
     h1, h2 {
       text-align: center;
-      color: #333;
+      color: #2c3e50;
     }
     .grid-wrapper {
       display: flex;
-      justify-content: center;
-      gap: 20px;
+      justify-content: space-around;
+      gap: 40px;
       margin-bottom: 30px;
     }
     .grid-container {
       display: flex;
       flex-direction: row-reverse;
-      gap: 2px;
+      gap: 4px;
     }
     .day-column {
       display: flex;
       flex-direction: column;
-      gap: 2px;
+      gap: 4px;
     }
     .status-cell {
-      width: 15px;
-      height: 15px;
-      background-color: #00ff00;
-      border-radius: 3px;
+      width: 18px;
+      height: 18px;
+      background-color: #00b894;
+      border-radius: 5px;
       cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+    .status-cell:hover {
+      transform: scale(1.1);
     }
     .error {
-      background-color: #ff0000;
+      background-color: #e74c3c;
     }
     .tooltip {
       position: absolute;
-      background-color: #333;
-      color: #fff;
-      padding: 5px;
-      border-radius: 3px;
+      background-color: rgba(44, 62, 80, 0.9);
+      color: #ecf0f1;
+      padding: 8px;
+      border-radius: 5px;
       font-size: 12px;
       z-index: 100;
       display: none;
@@ -60,27 +66,40 @@
     .grid-label {
       text-align: center;
       font-weight: bold;
-      margin-bottom: 5px;
+      margin-bottom: 10px;
+      color: #34495e;
     }
     #detailView {
       display: none;
-      margin-top: 30px;
+      margin-top: 40px;
     }
     .detail-grid {
       display: grid;
       grid-template-columns: repeat(24, 1fr);
-      gap: 2px;
+      gap: 4px;
       margin-bottom: 10px;
+      position: relative;
     }
     .detail-cell {
-      width: 20px;
-      height: 20px;
-      background-color: #00ff00;
-      border-radius: 3px;
+      width: 30px;
+      height: 30px;
+      background-color: #00b894;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    .detail-cell.error {
+      background-color: #e74c3c;
     }
     .detail-label {
       font-weight: bold;
-      margin-bottom: 5px;
+      margin-bottom: 10px;
+      color: #2c3e50;
+    }
+    .hour-label {
+      text-align: center;
+      font-size: 12px;
+      font-weight: bold;
+      color: #34495e;
     }
   </style>
 </head>
@@ -99,13 +118,31 @@
   </div>
   <div id="detailView">
     <h2>Detailed View</h2>
+    <h3 id="date"></h3>
     <div id="detailGrids"></div>
   </div>
 </div>
 <div id="tooltip" class="tooltip"></div>
 
-
 <script>
+  let endpointUrls; // 내부 변수 선언
+
+  async function fetchDistinctEndpoints() {
+    try {
+      const response = await fetch('/api/distinct-endpoints'); // API 호출
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      endpointUrls = await response.json(); // 내부 변수에 결과 저장
+      console.log(endpointUrls); // 내부 변수 확인
+    } catch (error) {
+      console.error('Fetch error:', error);
+    }
+  }
+
+  // 페이지가 로드될 때 함수 호출
+  window.onload = fetchDistinctEndpoints;
+
   document.addEventListener('DOMContentLoaded', () => {
     const odinGrid = document.getElementById('odinGrid');
     const heimdallGrid = document.getElementById('heimdallGrid');
@@ -189,14 +226,26 @@
       fetch(`/api/status/detail?group=${group}&start=${formattedStartDate}&end=${formattedEndDate}`)
               .then(response => response.json())
               .then(data => {
+                document.getElementById("date").innerHTML = `${formattedStartDate}일 ~ ${formattedEndDate}일`;
                 detailGrids.innerHTML = '';
+                let restUrlEndpoints = endpointUrls;
+                if (group === 'odin')
+                  restUrlEndpoints = restUrlEndpoints.odin;
+                else
+                  restUrlEndpoints = restUrlEndpoints.heimdall;
+
 
                 if (Object.keys(data).length === 0) {
                   const emptyGrid = createDetailGrid('ALL', [])
                   detailGrids.appendChild(emptyGrid);
                 } else {
                   for (const [endpointUrl, statusList] of Object.entries(data)) {
+                    restUrlEndpoints = restUrlEndpoints.filter(url => url !== endpointUrl); // 표시 안 해준 endpoint 보여주기 위해.
                     const detailGrid = createDetailGrid(endpointUrl, statusList);
+                    detailGrids.appendChild(detailGrid);
+                  }
+                  for (const restUrlEndpoint of restUrlEndpoints) { // 잔여 url 성공 표시위해
+                    const detailGrid = createDetailGrid(restUrlEndpoint, []);
                     detailGrids.appendChild(detailGrid);
                   }
                 }
@@ -212,21 +261,33 @@
       const grid = document.createElement('div');
       grid.className = 'detail-grid';
 
+      // Create hour labels at the top of the grid
+      for (let hour = 0; hour < 24; hour++) {
+        const hourLabel = document.createElement('div');
+        hourLabel.className = 'hour-label';
+        hourLabel.innerText = `${hour}시`;
+        grid.appendChild(hourLabel);
+      }
+
       for (let hour = 0; hour < 24; hour++) {
         const cell = document.createElement('div');
         cell.className = 'detail-cell';
-        if(statusList.length > 0) {
-          const cellTime = new Date(statusList[0].timeStamp);
-          cellTime.setHours(hour, 0, 0, 0);
 
-          const status = statusList.find(s => {
-            const statusTime = new Date(s.timeStamp);
-            return statusTime.getHours() === hour;
+        const currentStatus = statusList.find(status => new Date(status.timeStamp).getHours() === hour);
+
+        if (currentStatus && currentStatus.active === "false") {
+          cell.classList.add('error');
+          cell.setAttribute('data-txhash', currentStatus.txHash);
+          cell.setAttribute('data-log', currentStatus.log);
+
+          cell.addEventListener('mouseover', (event) => {
+            tooltip.innerHTML = `TxHash: ${currentStatus.txHash}<br>Log: ${currentStatus.log}`;
+            tooltip.style.display = 'block';
+            tooltip.style.left = `${event.pageX + 10}px`;
+            tooltip.style.top = `${event.pageY + 10}px`;
           });
 
-          if (status && status.active === "false") {
-            cell.style.backgroundColor = '#ff0000';
-          }
+          cell.addEventListener('mouseout', hideTooltip);
         }
 
         grid.appendChild(cell);
@@ -249,3 +310,4 @@
 </script>
 </body>
 </html>
+

@@ -62,6 +62,15 @@ export class NodeHealthService {
     return nodeHealths;
   }
 
+  async getDistinctEndpoints(): Promise<string[]> {
+    return await this.nodeHealthRepository
+        .createQueryBuilder('node_health')
+        .select('DISTINCT endpoint_url')
+        .where('id >= :id', { id: 1 })
+        .getRawMany()
+        .then((results) => results.map((result) => result.endpoint_url));
+  }
+
   async getPendingTransactions() {
     return await this.nodeHealthRepository.find({ where: { active: In(["pending", "staging"])}});
   }
