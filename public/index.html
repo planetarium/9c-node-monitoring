@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Node Health Status Dashboard</title>
+  <title>9c 모니터</title>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
@@ -34,6 +34,21 @@
       padding: 2rem;
     }
 
+    .detail-label-container {
+      background-color: #f0f4f8; /* 차분한 연한 파스텔 배경색 */
+      border: 1px solid #6c757d; /* 중립적인 회색 테두리 */
+      border-radius: 12px; /* 둥근 모서리 */
+      padding: 8px 16px; /* 컨테이너 내부 패딩 */
+      display: inline-block; /* 내용 크기에 맞게 컨테이너 크기 조정 */
+      margin-bottom: 10px; /* 하단 여백 */
+    }
+
+    .detail-label {
+      color: #495057; /* 중간 회색 텍스트 (너무 튀지 않으면서 깔끔한 색상) */
+      font-size: 16px; /* 텍스트 크기 */
+      font-weight: bold; /* 텍스트 강조 */
+    }
+
     h1, h2, h3 {
       text-align: center;
       margin-bottom: 2rem;
@@ -46,7 +61,7 @@
     }
 
     h2 {
-      font-size: 2rem;
+      font-size: 2.3rem;
     }
 
     h3 {
@@ -156,7 +171,7 @@
     }
 
     #date {
-      color: var(--warning-color);
+      color: var(--primary-color);
       font-size: 1.3rem; /* 날짜 표시를 더 강조 */
       text-align: center;
       margin-bottom: 1.5rem;
@@ -196,7 +211,7 @@
 </head>
 <body>
 <div class="container">
-  <h1>Node Health Status Dashboard</h1>
+  <h1>9c 모니터 대시보드</h1>
   <div class="status-grid">
     <div class="status-column">
       <div class="status-card">
@@ -419,7 +434,10 @@
 
     function createDetailGrid(endpointUrl, statusList) {
       const gridContainer = document.createElement('div');
-      gridContainer.innerHTML = `<div class="detail-label">${endpointUrl}</div>`;
+      gridContainer.innerHTML = `
+          <div class="detail-label-container">
+            <div class="detail-label">${endpointUrl}</div>
+          </div>`;
       const grid = document.createElement('div');
       grid.className = 'detail-grid';
 

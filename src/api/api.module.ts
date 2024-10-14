@@ -4,13 +4,10 @@ import { ApiController } from './api.controller';
 import { ApiService } from './api.service';
 import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { ScheduleModule } from "@nestjs/schedule";
 import { NodeHealthModule } from "./db/node-health/node-health.module";
 import { NodeHealth } from "./db/node-health/node-health";
 import { ServeStaticModule } from "@nestjs/serve-static";
 import { join } from 'path';
-import {NodeHealthService} from "./db/node-health/node-health.service";
-import {NodeHealthRepository} from "./db/node-health/node-health.repository";
 
 @Module({
   imports: [
@@ -29,7 +26,6 @@ import {NodeHealthRepository} from "./db/node-health/node-health.repository";
       entities: [NodeHealth],
       synchronize: true,
     }),
-    ScheduleModule.forRoot(),
     HttpModule,
     NodeHealthModule,
     ServeStaticModule.forRoot({
