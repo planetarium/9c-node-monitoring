@@ -29,7 +29,7 @@
     }
 
     .container {
-      max-width: 1200px;
+      max-width: 1600px;
       margin: 0 auto;
       padding: 2rem;
     }
@@ -113,6 +113,7 @@
       border-radius: 4px;
       background-color: var(--success-color);
       transition: all 0.3s ease;
+      margin: 2px 0px;
     }
 
     .status-cell.warning {
@@ -207,6 +208,40 @@
       margin-bottom: 0.75rem; /* 여유 공간 */
       color: var(--primary-color);
     }
+    .status-container {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: #7f8c8d;
+        margin-top: 10px;
+    }
+
+    .dotted-line {
+      margin: 0 10px;
+      flex-grow: 1;
+      height: 1px;
+      background: repeating-linear-gradient(
+          to right,
+          gray,
+          gray 20%,
+          transparent 20%,
+          transparent 25%
+      );
+      background-size: 10% 100%;
+    }
+    .nowrap {
+        white-space: nowrap;
+    }
+    .status-cell.highlight {
+      background-color: yellow !important;
+    }
+    .select-text {
+      text-align: right;
+      color: #7f8c8d;
+      font-size: 8pt;
+      margin-bottom: -10px;
+    }
+
   </style>
 </head>
 <body>
@@ -217,12 +252,25 @@
       <div class="status-card">
         <h3>Odin</h3>
         <div id="odinGrid" class="status-cells"></div>
+        <div class="status-container">
+          <span class="nowrap">today</span>
+          <div class="dotted-line"></div>
+          <span class="nowrap">30 days ago</span>
+        </div>
+        <p class="select-text">* 원하시는 날짜의 셀을 클릭해주세요</p>
       </div>
+      
     </div>
     <div class="status-column">
       <div class="status-card">
         <h3>Heimdall</h3>
         <div id="heimdallGrid" class="status-cells"></div>
+        <div class="status-container">
+          <span class="nowrap">today</span>
+          <div class="dotted-line"></div>
+          <span class="nowrap">30 days ago</span>
+        </div>
+        <p class="select-text">* 원하시는 날짜의 셀을 클릭해주세요</p>
       </div>
     </div>
   </div>
@@ -277,6 +325,9 @@
       for (let day = 0; day < 30; day++) {
         const dayColumn = document.createElement('div');
         dayColumn.className = 'day-column';
+        // 마우스 이벤트 리스너 추가
+        dayColumn.addEventListener('mouseenter', highlightColumn);
+        dayColumn.addEventListener('mouseleave', removeHighlight);
 
         for (let timeSlot = 0; timeSlot < 3; timeSlot++) {
           const statusCell = createAnimatedCell('status-cell');
@@ -314,7 +365,19 @@
         gridElement.appendChild(dayColumn);
       }
     }
+    // 열 하이라이트 함수
+    function highlightColumn(event) {
+      const column = event.currentTarget;
+      const cells = column.querySelectorAll('.status-cell');
+      cells.forEach(cell => cell.classList.add('highlight'));
+    }
 
+    // 하이라이트 제거 함수
+    function removeHighlight(event) {
+      const column = event.currentTarget;
+      const cells = column.querySelectorAll('.status-cell');
+      cells.forEach(cell => cell.classList.remove('highlight'));
+    }
     function showMainTooltip(event) {
       const cell = event.target;
       const startTime = new Date(cell.getAttribute('data-start'));

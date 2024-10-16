@@ -23,59 +23,60 @@ export class ApiService {
         private readonly configService: ConfigService,
         private readonly nodeHealthService: NodeHealthService
     ) {
+        const addresses = process.env.addresses.split(',');
+        const privatekeys = process.env.privatekeys.split(',');
       this.accounts = [
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_0'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_0'),
+              privateKey: privatekeys[0],
+              address: addresses[0],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_1'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_1'),
+              privateKey: privatekeys[1],
+              address: addresses[1],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_2'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_2'),
+              privateKey: privatekeys[2],
+              address: addresses[2],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_3'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_3'),
+              privateKey: privatekeys[3],
+              address: addresses[3],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_4'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_4'),
+              privateKey: privatekeys[4],
+              address: addresses[4],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_5'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_5'),
+              privateKey: privatekeys[5],
+              address: addresses[5],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_6'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_6'),
+              privateKey: privatekeys[6],
+              address: addresses[6],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_7'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_7'),
+              privateKey: privatekeys[7],
+              address: addresses[7],
           },
           {
-              privateKey: this.configService.get<string>('PRIVATE_KEY_8'),
-              address: this.configService.get<string>('ACCOUNT_ADDRESS_8'),
-          }
+              privateKey: privatekeys[8],
+              address: addresses[8],
+          },
       ];
-
     }
 
     public async getRPCEndPoints() {
-    const { data } = await firstValueFrom(
-        this.httpService.get(this.endPointListURL).pipe(
-            catchError((error: AxiosError) => {
-              console.log('Error fetching transaction history:', error.message);
-              throw new Error('An error occurred while fetching transaction history.');
-            }),
-        ),
-    );
-    const odinRPCEndpoints = data[0].rpcEndpoints['headless.gql'];
-    const heimdallRPCEndpoints = data[1].rpcEndpoints['headless.gql'];
-    return [ odinRPCEndpoints, heimdallRPCEndpoints ];
+        const {data} = await firstValueFrom(
+            this.httpService.get(this.endPointListURL).pipe(
+                catchError((error: AxiosError) => {
+                    console.log('Error fetching transaction history:', error.message);
+                    throw new Error('An error occurred while fetching transaction history.');
+                }),
+            ),
+        );
+        const odinRPCEndpoints = data[0].rpcEndpoints['headless.gql'];
+        const heimdallRPCEndpoints = data[1].rpcEndpoints['headless.gql'];
+        return [odinRPCEndpoints, heimdallRPCEndpoints];
     }
 
     public async send(groupName: string, rpcEndpoints: string[], timeStamp: Date) {
