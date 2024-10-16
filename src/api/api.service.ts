@@ -17,52 +17,58 @@ import * as http from "node:http";
 export class ApiService {
     private endPointListURL = "https://planets.nine-chronicles.com/planets/";
     private accounts;
+    private instance;
 
     constructor(
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
         private readonly nodeHealthService: NodeHealthService
     ) {
+        this.instance = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
+            httpAgent: new http.Agent({ keepAlive: true }),
+            httpsAgent: new https.Agent({ keepAlive: true }),
+            timeout: 30000,  // 타임아웃을 늘림
+        });
         const addresses = process.env.addresses.split(',');
         const privatekeys = process.env.privatekeys.split(',');
-      this.accounts = [
-          {
-              privateKey: privatekeys[0],
-              address: addresses[0],
-          },
-          {
-              privateKey: privatekeys[1],
-              address: addresses[1],
-          },
-          {
-              privateKey: privatekeys[2],
-              address: addresses[2],
-          },
-          {
-              privateKey: privatekeys[3],
-              address: addresses[3],
-          },
-          {
-              privateKey: privatekeys[4],
-              address: addresses[4],
-          },
-          {
-              privateKey: privatekeys[5],
-              address: addresses[5],
-          },
-          {
-              privateKey: privatekeys[6],
-              address: addresses[6],
-          },
-          {
-              privateKey: privatekeys[7],
-              address: addresses[7],
-          },
-          {
-              privateKey: privatekeys[8],
-              address: addresses[8],
-          },
-      ];
+        this.accounts = [
+            {
+                privateKey: privatekeys[0],
+                address: addresses[0],
+            },
+            {
+                privateKey: privatekeys[1],
+                address: addresses[1],
+            },
+            {
+                privateKey: privatekeys[2],
+                address: addresses[2],
+            },
+            {
+                privateKey: privatekeys[3],
+                address: addresses[3],
+            },
+            {
+                privateKey: privatekeys[4],
+                address: addresses[4],
+            },
+            {
+                privateKey: privatekeys[5],
+                address: addresses[5],
+            },
+            {
+                privateKey: privatekeys[6],
+                address: addresses[6],
+            },
+            {
+                privateKey: privatekeys[7],
+                address: addresses[7],
+            },
+            {
+                privateKey: privatekeys[8],
+                address: addresses[8],
+            },
+        ];
     }
 
     public async getRPCEndPoints() {
@@ -169,21 +175,17 @@ export class ApiService {
         return txId;
     }
 
+
     async nextTxNonce(endpoint: string, address: string): Promise<number> {
-        let {data} = await axios.create({timeout: 10000})({
-            method: "POST",
-            url: endpoint,
-            data: {
-                variables: {address},
-                query: `
+        const {data} = await this.instance.post(endpoint, {
+            variables: {address},
+            query: `
               query getNextTxNonce($address: Address!){
                 transaction{
                     nextTxNonce(address: $address)
                 }
               }
-            `,
-            },
-        });
+            `})
         return data["data"]["transaction"]["nextTxNonce"];
     }
 
@@ -195,59 +197,41 @@ export class ApiService {
             decimalPlaces: 18
         };
 
-        let { data } = await axios({
-            method: "POST",
-            url: endpoint,
-            data: {
-                variables: { publicKey, plainValue, nonce, maxGasPrice },
-                query: `
+        const { data } = await this.instance.post(endpoint, {
+            variables: { publicKey, plainValue, nonce, maxGasPrice },
+            query: `
                 query unsignedTx($publicKey: String!, $plainValue: String!, $nonce: Long, $maxGasPrice: FungibleAssetValueInputType) {
                   transaction {
                     unsignedTransaction(publicKey: $publicKey, plainValue: $plainValue nonce: $nonce, maxGasPrice: $maxGasPrice)
                   }
                 }
-              `,
-            },
-        });
-
-        if (data['errors']) {
-            console.error(data['errors']);
-            throw data;
-        }
+              `})
         return data["data"]["transaction"]["unsignedTransaction"];
     }
 
     async signTransaction(endpoint: string, unsignedTx: string, base64Sign: string): Promise<any> {
-        let { data } = await axios({
-            method: 'POST',
-            url: endpoint,
-            data: {
-                "variables": { unsignedTx, signature: base64Sign },
-                "query": `
+        const { data } = await this.instance.post(endpoint, {
+            "variables": { unsignedTx, signature: base64Sign },
+            "query": `
                   query attachSignature($unsignedTx: String!, $signature: String!) {
                     transaction {
                       signTransaction(unsignedTransaction: $unsignedTx, signature: $signature)
                     }
                   }
                 `
-            }
-        });
+        })
         return data;
     }
 
     async stageTx(endpoint: string, payload: string): Promise<{ txId: string }> {
-        let {data} = await axios({
-            method: "POST",
-            url: endpoint,
-            data: {
-                variables: {payload},
-                query: `
+        const { data } = await this.instance.post(endpoint, {
+            variables: {payload},
+            query: `
             mutation transfer($payload: String!) {
               stageTransaction(payload: $payload)
             }
-          `,
-            },
-        });
+          `
+        })
         try {
             return {txId: data["data"]["stageTransaction"]};
         } catch (e) {
@@ -257,14 +241,10 @@ export class ApiService {
     }
 
     async getTxStatus(endpoint: string, txId: string) {
-        let { data } = await axios({
-            method: 'POST',
-            httpAgent: new http.Agent({ keepAlive: true }),
-            httpsAgent: new https.Agent({ keepAlive: true }),
-            url: endpoint,
-            data: {
-                "variables": { txId },
-                "query": `
+
+        const { data } = await this.instance.post(endpoint, {
+            variables: { txId },
+            query: `
                   query getTx {
                     transaction {
                       transactionResult(txId: "${txId}") {
@@ -274,8 +254,7 @@ export class ApiService {
                     }
                   }
                 `
-            }
-        });
+        })
         return data['data']['transaction']['transactionResult'];
     }
 
