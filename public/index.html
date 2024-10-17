@@ -34,19 +34,12 @@
       padding: 2rem;
     }
 
-    .detail-label-container {
-      background-color: #f0f4f8; /* 차분한 연한 파스텔 배경색 */
-      border: 1px solid #6c757d; /* 중립적인 회색 테두리 */
-      border-radius: 12px; /* 둥근 모서리 */
-      padding: 8px 16px; /* 컨테이너 내부 패딩 */
-      display: inline-block; /* 내용 크기에 맞게 컨테이너 크기 조정 */
-      margin-bottom: 10px; /* 하단 여백 */
-    }
 
     .detail-label {
       color: #495057; /* 중간 회색 텍스트 (너무 튀지 않으면서 깔끔한 색상) */
-      font-size: 16px; /* 텍스트 크기 */
+      font-size: 20px; /* 텍스트 크기 */
       font-weight: bold; /* 텍스트 강조 */
+      margin-bottom: 5px;
     }
 
     h1, h2, h3 {
@@ -69,8 +62,9 @@
     }
 
     .status-grid {
-      display: flex;
-      justify-content: space-between;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 2rem;
       margin-bottom: 3rem;
     }
 
@@ -84,7 +78,7 @@
       border-radius: var(--border-radius);
       box-shadow: 0 8px 12px var(--box-shadow-color);
       padding: 2rem; /* 더 넉넉한 패딩 */
-      margin-bottom: 2rem;
+      margin-bottom: 0rem;
       transition: transform 0.3s ease, box-shadow 0.3s ease;
     }
 
@@ -107,13 +101,9 @@
       gap: 6px;
     }
 
-    .status-cell {
-      width: 100%;
-      padding-bottom: 100%;
-      border-radius: 4px;
-      background-color: var(--success-color);
-      transition: all 0.3s ease;
-      margin: 2px 0px;
+    .grid-container {
+      display: flex;
+      align-items: flex-start;
     }
 
     .status-cell.warning {
@@ -124,6 +114,12 @@
     }
     .status-cell.error {
       background-color: var(--error-color);
+    }
+    .status-cell.future {
+      background-color: #d3d3d3; /* 연한 회색 */
+    }
+    .status-cell.now {
+      background-color: #3498db; /* 현재 시간 */
     }
 
     .status-cell:hover {
@@ -196,45 +192,76 @@
       to { opacity: 1; }
     }
 
-    .hour-label {
-      text-align: center;
-      font-size: 0.8rem;
-      color: #7f8c8d;
-      margin-bottom: 0.5rem; /* 여유 공간 */
-    }
-
     .endpoint-label {
       font-weight: 600;
       margin-bottom: 0.75rem; /* 여유 공간 */
       color: var(--primary-color);
     }
+    .status-cells {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .hour-label-row {
+      display: flex;
+      margin-left: 50px; /* 날짜 레이블을 위한 공간 */
+    }
+
+    .hour-label {
+      width: 30px;
+      height: 20px;
+      text-align: center;
+      font-size: 0.7em;
+      color: #7f8c8d;
+    }
+
+    .day-row {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .date-label {
+      width: 30px;
+      text-align: center;
+      padding-right: 0px;
+      font-size: 0.8em;
+      color: #7f8c8d;
+    }
+
+    .status-cell {
+      width: 30px;
+      height: 7px;
+      padding: 0;
+      margin-bottom: 1px;
+      border-radius: 5px;
+      background-color: var(--success-color);
+      transition: all 0.3s ease;
+    }
+
     .status-container {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        color: #7f8c8d;
-        margin-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      color: #7f8c8d;
+      margin-top: 10px;
     }
 
     .dotted-line {
-      margin: 0 10px;
-      flex-grow: 1;
-      height: 1px;
+      width: 1px;
+      height: 100%; /* 세로 길이를 컨테이너에 맞춤 */
       background: repeating-linear-gradient(
-          to right,
-          gray,
-          gray 20%,
-          transparent 20%,
-          transparent 25%
+              to bottom,
+              gray,
+              gray 20%,
+              transparent 20%,
+              transparent 25%
       );
-      background-size: 10% 100%;
+      background-size: 100% 10%; /* 세로 방향으로 패턴 크기 조정 */
+      margin: 0 10px;
+      position: absolute; /* 절대 위치로 배치 */
     }
-    .nowrap {
-        white-space: nowrap;
-    }
-    .status-cell.highlight {
-      background-color: yellow !important;
-    }
+
     .select-text {
       text-align: right;
       color: #7f8c8d;
@@ -242,37 +269,40 @@
       margin-bottom: -10px;
     }
 
+    .status-cell.highlight {
+      background-color: yellow !important;
+    }
+
+
   </style>
 </head>
 <body>
 <div class="container">
   <h1>9c 모니터 대시보드</h1>
   <div class="status-grid">
-    <div class="status-column">
       <div class="status-card">
         <h3>Odin</h3>
-        <div id="odinGrid" class="status-cells"></div>
-        <div class="status-container">
-          <span class="nowrap">today</span>
-          <div class="dotted-line"></div>
-          <span class="nowrap">30 days ago</span>
+        <div class="grid-container">
+            <div class="date-labels">
+
+            </div>
+          <div id="odinGrid" class="status-cells"></div>
         </div>
         <p class="select-text">* 원하시는 날짜의 셀을 클릭해주세요</p>
       </div>
-      
-    </div>
-    <div class="status-column">
+
+
       <div class="status-card">
         <h3>Heimdall</h3>
-        <div id="heimdallGrid" class="status-cells"></div>
-        <div class="status-container">
-          <span class="nowrap">today</span>
-          <div class="dotted-line"></div>
-          <span class="nowrap">30 days ago</span>
+        <div class="grid-container">
+          <div class="date-labels">
+
+          </div>
+          <div id="heimdallGrid" class="status-cells"></div>
         </div>
         <p class="select-text">* 원하시는 날짜의 셀을 클릭해주세요</p>
       </div>
-    </div>
+
   </div>
   <div id="detailView" class="detailed-view" style="display: none;">
     <h2 id="date"></h2>
@@ -322,38 +352,40 @@
 
     function createStatusGrid(gridElement) {
       const now = new Date();
-      for (let day = 0; day < 30; day++) {
+      const year = now.getFullYear();
+      let month = now.getMonth() + 1;
+      const thisMonthLastDay = new Date(year, month, 0).getDate();
+      if(month <= 9)
+        month = '0' + month
+
+      const formattedNow = `${year}-${month}-${now.getDate()}T${now.getHours()}`;
+      for (let day = 1; day <= thisMonthLastDay; day++) {
+        if(day <= 9)
+          day = '0' + day;
         const dayColumn = document.createElement('div');
-        dayColumn.className = 'day-column';
+        dayColumn.className = 'day-row';
         // 마우스 이벤트 리스너 추가
-        dayColumn.addEventListener('mouseenter', highlightColumn);
-        dayColumn.addEventListener('mouseleave', removeHighlight);
 
-        for (let timeSlot = 0; timeSlot < 3; timeSlot++) {
+        const dateLabel = document.createElement('div');
+        dateLabel.className = 'date-label';
+        dateLabel.textContent = `${Math.floor(day)}일`;
+        dayColumn.appendChild(dateLabel);
+
+        for (let hour = 0; hour < 24; hour++) {
+          if(hour <= 9)
+            hour = '0' + hour;
           const statusCell = createAnimatedCell('status-cell');
-
-          const date = new Date(now);
-          date.setDate(date.getDate() - day);
-          const dateStr = date.toISOString().split('T')[0];
-
-          const startHour = timeSlot * 8;
-          const endHour = startHour + 8;
-
-          statusCell.id = `${gridElement.id}-cell-${dateStr}-${timeSlot}`;
-          statusCell.setAttribute('data-start', `${dateStr} ${String(startHour).padStart(2, '0')}:00:00`);
-          statusCell.setAttribute('data-end', `${dateStr} ${String(endHour).padStart(2, '0')}:00:00`);
+          const date = `${year}-${month}-${day}T${hour}`;
+          statusCell.id = `${gridElement.id}-cell-${date}`
+          statusCell.setAttribute('date', date);
           statusCell.setAttribute('data-group', gridElement.id === 'odinGrid' ? 'odin' : 'heimdall');
-          statusCell.setAttribute('data-tooltip', formatDate(dateStr))
-          function formatDate(date) {
-            return date.toLocaleString('ko-KR', {
-              year: 'numeric',
-              month: '2-digit',
-              day: '2-digit',
-              hour: '2-digit',
-              minute: '2-digit',
-              hour12: false,
-              timeZone: 'Asia/Seoul' // KST 기준으로 출력
-            });
+          statusCell.setAttribute('data-tooltip', `${month}월 ${day}일 ${hour}시`);
+
+          if(formattedNow < date) {
+            statusCell.className = 'status-cell future';
+          }
+          else if(formattedNow === date) {
+            statusCell.className = 'status-cell now'
           }
           statusCell.addEventListener('mouseover', showTooltip);
           statusCell.addEventListener('mouseout', hideTooltip);
@@ -361,6 +393,8 @@
 
           dayColumn.appendChild(statusCell);
         }
+        dayColumn.addEventListener('mouseenter', highlightColumn);
+        dayColumn.addEventListener('mouseleave', removeHighlight);
 
         gridElement.appendChild(dayColumn);
       }
@@ -378,18 +412,6 @@
       const cells = column.querySelectorAll('.status-cell');
       cells.forEach(cell => cell.classList.remove('highlight'));
     }
-    function showMainTooltip(event) {
-      const cell = event.target;
-      const startTime = new Date(cell.getAttribute('data-start'));
-      const endTime = new Date(cell.getAttribute('data-end'));
-      const formattedStart = formatDate(startTime);
-      const formattedEnd = formatDate(endTime);
-
-      tooltip.innerHTML = `Time range: ${formattedStart} - ${formattedEnd} (KST)`;
-      tooltip.style.display = 'block';
-      tooltip.style.left = `${event.pageX + 10}px`;
-      tooltip.style.top = `${event.pageY + 10}px`;
-    }
 
     function updateStatusCells(statusData) {
       for (const [groupName, data] of Object.entries(statusData)) {
@@ -397,10 +419,11 @@
 
         data.forEach(status => {
           const [dateStr, timeStr] = status.timeStamp.split('T');
-          const hour = parseInt(timeStr.split(':')[0]);
-          const timeSlot = Math.floor(hour / 8);
+          let hour = parseInt(timeStr.split(':')[0]);
 
-          const cellId = `${gridElement.id}-cell-${dateStr}-${timeSlot}`;
+          if(hour <= 9)
+            hour = '0' + hour;
+          const cellId = `${gridElement.id}-cell-${dateStr}T${hour}`;
           const cell = document.getElementById(cellId);
 
           if (!cellInactiveCount.has(cellId)) {
@@ -457,16 +480,15 @@
 
     function showDetailView(event) {
       const cell = event.target;
-      const startDate = new Date(cell.getAttribute('data-start'));
+      const date = cell.getAttribute('date');
       const group = cell.getAttribute('data-group');
-
-      const formattedStartDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate()).padStart(2, '0')}`;
-      const formattedEndDate = `${startDate.getFullYear()}-${String(startDate.getMonth() + 1).padStart(2, '0')}-${String(startDate.getDate() + 1).padStart(2, '0')}`;
-
-      fetch(`/api/status/detail?group=${group}&start=${formattedStartDate}&end=${formattedEndDate}`)
+      const formattedStartDate = date;
+      const formattedEndDate = new Date(date+':00:00Z');
+      formattedEndDate.setDate(formattedEndDate.getDate() + 1);
+      fetch(`/api/status/detail?group=${group}&start=${formattedStartDate.split('T')[0]}&end=${formattedEndDate.toISOString().split('T')[0]}`)
               .then(response => response.json())
               .then(data => {
-                document.getElementById("date").innerHTML = `${formattedStartDate}일`;
+                document.getElementById("date").innerHTML = `${formattedStartDate.split('T')[0]}일`;
                 detailGrids.innerHTML = '';
                 let restUrlEndpoints = endpointUrls;
                 if (group === 'odin')
@@ -547,6 +569,8 @@
               updateStatusCells(data);
             })
             .catch(error => console.error('Error fetching status data:', error));
+
+
   });
 </script>
 </body>
