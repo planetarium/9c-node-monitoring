@@ -17,13 +17,14 @@ export class ApiController {
     const [ odinRPCEndpoints, heimdallRPCEndpoints ] = await this.apiService.getRPCEndPoints();
     const commonTimestamp = new Date();
     commonTimestamp.setSeconds(0, 0);
-    this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
-    this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
+    commonTimestamp.setHours(commonTimestamp.getHours() + 9);
+    await this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
+    await this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
   }
 
   @Get('/check')
   async checkTx() {
-    this.apiService.resolvePendingTransactions();
+    await this.apiService.resolvePendingTransactions();
   }
 
   @Get('/status')

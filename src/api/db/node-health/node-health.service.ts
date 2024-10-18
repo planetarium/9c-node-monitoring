@@ -10,10 +10,7 @@ export class NodeHealthService {
   async savePendingTx(group_name: string, endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
     const nodeHealth = new NodeHealth();
 
-    // 9시간 더하기
-    const adjustedTimeStamp = new Date(timeStamp.getTime() + 9 * 60 * 60 * 1000);
-
-    nodeHealth.timeStamp = adjustedTimeStamp;  // 9시간 더한 시간을 timestamp에 저장
+    nodeHealth.timeStamp = timeStamp;  // 9시간 더한 시간을 timestamp에 저장
     nodeHealth.txHash = txHash;
     nodeHealth.group_name = group_name;
     nodeHealth.endpoint_url = endpoint_url;
@@ -38,13 +35,13 @@ export class NodeHealthService {
 
     const odinNodes = nodeHealths.filter(nodeHealth => nodeHealth.group_name === 'odin')
         .map(n => {
-          n.timeStamp = new Date(n.timeStamp.getTime() + (9 * 60 * 60 * 1000)); // 9시간 추가
+          n.timeStamp = new Date(n.timeStamp.getTime()); // 9시간 추가
           return n;
         });
 
     const heimdallNodes = nodeHealths.filter(nodeHealth => nodeHealth.group_name === 'heimdall')
         .map(n => {
-          n.timeStamp = new Date(n.timeStamp.getTime() + (9 * 60 * 60 * 1000)); // 9시간 추가
+          n.timeStamp = new Date(n.timeStamp.getTime()); // 9시간 추가
           return n;
         });
 

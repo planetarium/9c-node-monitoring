@@ -261,28 +261,24 @@ export class ApiService {
     async resolvePendingTransactions() {
         const pendingTransactions = await this.nodeHealthService.getPendingTransactions();
 
-        const statusPromises = pendingTransactions.map(async (row) => {
+        for (const row of pendingTransactions) {
             const status = await this.getTxStatus(row.endpoint_url, row.txHash);
-            return {
+            const result = {
                 id: row.id,
                 status,
             };
-        });
 
-        // 한 번에 비동기로 쫙 보내고, 결과 처리 같이 하기.
-        const results = await Promise.all(statusPromises);
-
-        // 결과 처리
-        results.forEach(result => {
-            if(result.status.txStatus === 'SUCCESS')
-                this.nodeHealthService.updateCompletedTx(result.id);
-            else if(result.status.txStatus === 'STAGING')
-                this.nodeHealthService.updateStagingTx(result.id);
-            else
-                this.nodeHealthService.updateFailedTx(result.id, result.status.exceptionNames);
+            if (result.status.txStatus === 'SUCCESS') {
+                await this.nodeHealthService.updateCompletedTx(result.id);
+            } else if (result.status.txStatus === 'STAGING') {
+                await this.nodeHealthService.updateStagingTx(result.id);
+            } else {
+                await this.nodeHealthService.updateFailedTx(result.id, result.status.exceptionNames);
+            }
             console.log(result);
-        });
+        }
     }
+
 
 }
 interface FungibleAssetValue {

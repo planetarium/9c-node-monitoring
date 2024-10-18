@@ -35,4 +35,19 @@ functions:
           path: /  # 기본 경로
       - httpApi:
           method: GET  # GET 메서드
+          path: /api/endpoint
+      - httpApi:
+          method: GET  # GET 메서드
+          path: /api/send
+      - httpApi:
+          method: GET  # GET 메서드
           path: /api/check
+      - httpApi:
+          method: GET  # GET 메서드
+          path: /api/status
+      - httpApi:
+          method: GET  # GET 메서드
+          path: /api/status/detail
+      - httpApi:
+          method: GET  # GET 메서드
+          path: /api/distinct-endpoints
