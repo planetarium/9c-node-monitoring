@@ -18,8 +18,8 @@ export class ApiController {
     const commonTimestamp = new Date();
     commonTimestamp.setSeconds(0, 0);
     commonTimestamp.setHours(commonTimestamp.getHours() + 9);
-    await this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
-    await this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
+    this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
+    this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
   }
 
   @Get('/check')

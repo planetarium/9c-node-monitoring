@@ -9,8 +9,7 @@ export class NodeHealthService {
 
   async savePendingTx(group_name: string, endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
     const nodeHealth = new NodeHealth();
-
-    nodeHealth.timeStamp = timeStamp;  // 9시간 더한 시간을 timestamp에 저장
+    nodeHealth.timeStamp = timeStamp;
     nodeHealth.txHash = txHash;
     nodeHealth.group_name = group_name;
     nodeHealth.endpoint_url = endpoint_url;
@@ -51,8 +50,6 @@ export class NodeHealthService {
   async getDetail(group: string, startTimeStamp: string, endTimeStamp: string) {
     const startDate = new Date(startTimeStamp);
     const endDate = new Date(endTimeStamp);
-    startDate.setTime(startDate.getTime() - (9 * 60 * 60 * 1000)) // timestamp 때문에 이렇게 조회해야함. 나중에 수정하자. TODO
-    endDate.setTime(endDate.getTime() - (9 * 60 * 60 * 1000));
     let nodeHealths = await this.nodeHealthRepository.find({
       where: {
         timeStamp: Between(startDate , endDate),

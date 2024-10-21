@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>9c 모니터</title>
+    <script src="https://cdn.jsdelivr.net/npm/dayjs@1.10.7/dayjs.min.js"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
 
@@ -483,9 +484,9 @@
       const date = cell.getAttribute('date');
       const group = cell.getAttribute('data-group');
       const formattedStartDate = date;
-      const formattedEndDate = new Date(date+':00:00Z');
-      formattedEndDate.setDate(formattedEndDate.getDate() + 1);
-      fetch(`/api/status/detail?group=${group}&start=${formattedStartDate.split('T')[0]}&end=${formattedEndDate.toISOString().split('T')[0]}`)
+      const formattedEndDate = dayjs(date).add(1, 'day').format('YYYY-MM-DD');
+
+      fetch(`/api/status/detail?group=${group}&start=${formattedStartDate.split('T')[0]}&end=${formattedEndDate}`)
               .then(response => response.json())
               .then(data => {
                 document.getElementById("date").innerHTML = `${formattedStartDate.split('T')[0]}일`;
@@ -536,8 +537,12 @@
 
       for (let hour = 0; hour < 24; hour++) {
         const cell = createAnimatedCell('detail-cell');
-        const currentStatus = statusList.find(status => new Date(status.timeStamp).getHours() === hour);
+        const currentStatus = statusList.find(status => {
+            const date = new Date(status.timeStamp);
+            date.setHours(date.getHours() - 9); //9시간을 빼줘야 된다.
 
+            return date.getHours() === hour;
+          });
         if (currentStatus && currentStatus.active === "false") {
           cell.classList.add('error');
           cell.setAttribute('data-txhash', currentStatus.txHash);
