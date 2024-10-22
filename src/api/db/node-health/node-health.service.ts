@@ -60,6 +60,18 @@ export class NodeHealthService {
     return nodeHealths;
   }
 
+  async getLost(group: string, startTimeStamp: string, endTimeStamp: string) {
+    const startDate = new Date(startTimeStamp);
+    const endDate = new Date(endTimeStamp);
+    let nodeHealths = await this.nodeHealthRepository.find({
+      where: {
+        timeStamp: Between(startDate , endDate),
+        group_name: group //순서 고려해보자 인덱스
+      }
+    });
+    return nodeHealths;
+  }
+
   async getDistinctEndpoints(): Promise<string[]> {
     return await this.nodeHealthRepository
         .createQueryBuilder('node_health')

@@ -11,6 +11,7 @@ import { ethers } from "ethers"; //"ethers": "^5.5.1";
 import {NodeHealthService} from "./db/node-health/node-health.service";
 import * as https from "node:https";
 import * as http from "node:http";
+import {NodeHealth} from "./db/node-health/node-health";
 
 
 @Injectable()
@@ -27,7 +28,7 @@ export class ApiService {
         this.instance = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
             httpAgent: new http.Agent({ keepAlive: true }),
             httpsAgent: new https.Agent({ keepAlive: true }),
-            timeout: 30000,  // 타임아웃을 늘림
+            timeout: 60000,  // 타임아웃을 늘림
         });
         const addresses = process.env.addresses.split(',');
         const privatekeys = process.env.privatekeys.split(',');
@@ -101,6 +102,42 @@ export class ApiService {
             console.log('Sender', sender, 'Recipient', recipient);
             await this.nodeHealthService.savePendingTx(groupName, rpcEndpoints[i], txHash, timeStamp)
         }
+    }
+
+    public async findLostRequest(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
+        const allTimestamps = [];
+        let current = new Date(startTimeStamp);
+        const end = new Date(endTimeStamp);
+        // 각 endpoint_url마다 체크
+        while (current <= end) {
+            allTimestamps.push(current.toISOString());
+            current.setMinutes(current.getMinutes() + 1);  // 1분씩 증가
+        }
+
+        const missingNodesByEndpoint: { [key: string]: NodeHealth[] } = {};
+
+        for (const [endpoint_url, data] of Object.entries(groupedData)) {
+            // 타임스탬프를 기준으로 NodeHealth 객체를 매핑
+            const timestampMap = new Map<string, NodeHealth>();
+            data.forEach(item => {
+                const itemTimestamp = new Date(item.timeStamp).toISOString();
+                timestampMap.set(itemTimestamp, item); // timeStamp를 키로 객체 저장
+            });
+            const missingNodes: NodeHealth[] = [];
+
+            // 누락된 NodeHealth 객체 찾기
+            allTimestamps.forEach(timestamp => {
+                if (!timestampMap.has(timestamp))
+                    missingNodes.push({ timeStamp: timestamp } as NodeHealth);                     // 누락된 타임스탬프가 있으면 해당 객체는 존재하지 않음
+            });
+
+            if (missingNodes.length > 0) {
+                missingNodesByEndpoint[endpoint_url] = missingNodes; // 누락된 노드를 저장
+            }
+            else
+                missingNodesByEndpoint[endpoint_url] = [];
+        }
+        return missingNodesByEndpoint;
     }
 
     private makeTransferInOdin(sender: string, recipient: string) {
