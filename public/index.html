@@ -380,7 +380,6 @@
         throw new Error('Network response was not ok');
       }
       endpointUrls = await response.json(); // 내부 변수에 결과 저장
-      console.log(endpointUrls); // 내부 변수 확인
     } catch (error) {
       console.error('Fetch error:', error);
     }
@@ -605,16 +604,16 @@
     }
 
     function showDetailView(event) {
-      const cell = event.target;
-      const date = cell.getAttribute('date');
-      const group = cell.getAttribute('data-group');
+      const grid = event.target;
+      const date = grid.getAttribute('date').split('T')[0];
+      const group = grid.getAttribute('data-group');
       const formattedStartDate = date;
       const formattedEndDate = dayjs(date).add(1, 'day').format('YYYY-MM-DD');
 
       fetch(`/api/status/detail?group=${group}&start=${formattedStartDate.split('T')[0]}&end=${formattedEndDate}`)
               .then(response => response.json())
               .then(data => {
-                document.getElementById("date").innerHTML = `${formattedStartDate.split('T')[0]}일`;
+                document.getElementById("date").innerHTML = `${formattedStartDate}일`;
                 detailGrids.innerHTML = '';
                 let restUrlEndpoints = endpointUrls;
                 if (group === 'odin')
@@ -622,18 +621,17 @@
                 else
                   restUrlEndpoints = restUrlEndpoints.heimdall;
 
-
                 if (Object.keys(data).length === 0) {
-                  const emptyGrid = createDetailGrid('전체', [])
+                  const emptyGrid = createDetailGrid(date, '전체', [])
                   detailGrids.appendChild(emptyGrid);
                 } else {
                   for (const [endpointUrl, statusList] of Object.entries(data)) {
                     restUrlEndpoints = restUrlEndpoints.filter(url => url !== endpointUrl);
-                    const detailGrid = createDetailGrid(endpointUrl, statusList);
+                    const detailGrid = createDetailGrid(date, endpointUrl, statusList);
                     detailGrids.appendChild(detailGrid);
                   }
                   for (const restUrlEndpoint of restUrlEndpoints) { // 잔여 url 성공 표시위해
-                    const detailGrid = createDetailGrid(restUrlEndpoint, []);
+                    const detailGrid = createDetailGrid(date, restUrlEndpoint, []);
                     detailGrids.appendChild(detailGrid);
                   }
                 }
@@ -644,7 +642,7 @@
               .catch(error => console.error('Error fetching detail data:', error));
     }
 
-    function createDetailGrid(endpointUrl, statusList) {
+    function createDetailGrid(cellDate, endpointUrl, statusList) {
       const gridContainer = document.createElement('div');
       gridContainer.innerHTML = `
           <div class="detail-label-container">
@@ -661,15 +659,33 @@
         grid.appendChild(hourLabel);
       }
 
+      const now = new Date();
+
+      let today = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate() +'T';
+      const formattedHour = (now.getHours() <= 9) ? '0' + now.getHours() : now.getHours();
+      today += formattedHour;
+
       for (let hour = 0; hour < 24; hour++) {
         const cell = createAnimatedCell('detail-cell');
+        const formattedHour = (hour <= 9) ? '0' + hour : hour;
+        if(today < cellDate + 'T' + formattedHour) { //현 시간보다 이후일 경우
+          cell.className = 'status-cell future';
+          grid.appendChild(cell);
+          continue;
+        }
+        else if(today === cellDate + 'T' + formattedHour) {
+          cell.className = 'status-cell now';
+          grid.appendChild(cell);
+          continue;
+        }
+
         const currentStatus = statusList.find(status => {
             const date = new Date(status.timeStamp);
             date.setHours(date.getHours() - 9); //9시간을 빼줘야 된다.
 
             return date.getHours() === hour;
           });
-        if (currentStatus && currentStatus.active === "false") {
+        if (currentStatus && currentStatus.active === "false" && currentStatus.log !== "Libplanet.Action.State.InsufficientBalanceException") {
           cell.classList.add('error');
           cell.setAttribute('data-txhash', currentStatus.txHash);
           cell.setAttribute('data-log', currentStatus.log);
