@@ -21,6 +21,20 @@ export class NodeHealthService {
     }
   }
 
+  async saveInactiveStatus(group_name: string, endpoint_url: string, timeStamp: Date): Promise<void> {
+    const nodeHealth = new NodeHealth();
+    nodeHealth.timeStamp = timeStamp;
+    nodeHealth.txHash = '';
+    nodeHealth.group_name = group_name;
+    nodeHealth.endpoint_url = endpoint_url;
+    nodeHealth.active = 'lost';
+    try {
+      await this.nodeHealthRepository.save(nodeHealth);
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
   async getStatus() {
     const now = new Date();
     const oneMonthsAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);

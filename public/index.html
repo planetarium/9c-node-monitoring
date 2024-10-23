@@ -368,7 +368,7 @@
     setTimeout(() => {
       cell.style.transform = 'scale(1)';
       cell.style.opacity = '1';
-    }, Math.random() * 500);
+    }, Math.random() * 200);
 
     return cell;
   }
@@ -424,8 +424,6 @@
       createStatusGrid(odinGrid, monthlyData);
       createStatusGrid(heimdallGrid, monthlyData);
 
-
-      // Update status cells with new data
       cellInactiveCount.clear();
       const statusData = {
         odin: Object.values(monthlyData.odin).flat(),
@@ -641,6 +639,7 @@
                 }
 
                 detailView.style.display = 'block';
+                detailView.scrollIntoView({ behavior: 'smooth', block: 'start' });
               })
               .catch(error => console.error('Error fetching detail data:', error));
     }

@@ -28,7 +28,7 @@ export class ApiService {
         this.instance = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
             httpAgent: new http.Agent({ keepAlive: true }),
             httpsAgent: new https.Agent({ keepAlive: true }),
-            timeout: 60000,  // 타임아웃을 늘림
+            timeout: 5000,
         });
         const addresses = process.env.addresses.split(',');
         const privatekeys = process.env.privatekeys.split(',');
@@ -97,10 +97,15 @@ export class ApiService {
                 action = this.makeTransferInOdin(sender, recipient);
             else
                 action = this.makeTransferInHeimdall(sender, recipient);
-            const txHash = await this.sendTx(rpcEndpoints[i], action, this.accounts[i]);
-            console.log('Network', rpcEndpoints[i],'sendtx', txHash);
-            console.log('Sender', sender, 'Recipient', recipient);
-            await this.nodeHealthService.savePendingTx(groupName, rpcEndpoints[i], txHash, timeStamp)
+            try {
+                const txHash = await this.sendTx(rpcEndpoints[i], action, this.accounts[i]);
+                console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
+                console.log('Sender', sender, 'Recipient', recipient);
+                await this.nodeHealthService.savePendingTx(groupName, rpcEndpoints[i], txHash, timeStamp);
+            } catch (error) {
+                console.error(`Error sending transaction to ${rpcEndpoints[i]}:`, error.message || error);
+                await this.nodeHealthService.saveInactiveStatus(groupName, rpcEndpoints[i], timeStamp)
+            }
         }
     }
 

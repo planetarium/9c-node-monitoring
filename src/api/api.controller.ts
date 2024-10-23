@@ -18,8 +18,8 @@ export class ApiController {
     const commonTimestamp = new Date();
     commonTimestamp.setSeconds(0, 0);
     commonTimestamp.setHours(commonTimestamp.getHours() + 9);
-    this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
-    this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
+    await this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
+    await this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
   }
 
   @Get('/check')
@@ -45,6 +45,20 @@ export class ApiController {
     }, {});
 
     return groupedData;
+  }
+
+  @Get(`/status/lost`)
+  async getLost(@Query("group") group: string, @Query("start") startTimeStamp: string, @Query("end") endTimeStamp: string) {
+    let details = await this.nodeHealthService.getLost(group, startTimeStamp, endTimeStamp);
+    const groupedData = details.reduce((acc, item) => {
+      const endpoint = item.endpoint_url;
+      if (!acc[endpoint]) {
+        acc[endpoint] = [];
+      }
+      acc[endpoint].push(item);
+      return acc;
+    }, {});
+    return await this.apiService.findLostRequest(startTimeStamp, endTimeStamp, groupedData);
   }
 
   @Get('/distinct-endpoints')
