@@ -21,7 +21,7 @@ export class NodeHealthService {
     }
   }
 
-  async saveInactiveStatus(group_name: string, endpoint_url: string, timeStamp: Date): Promise<void> {
+  async saveLostStatus(group_name: string, endpoint_url: string, timeStamp: Date): Promise<void> {
     const nodeHealth = new NodeHealth();
     nodeHealth.timeStamp = timeStamp;
     nodeHealth.txHash = '';
@@ -76,7 +76,12 @@ export class NodeHealthService {
 
   async getLost(group: string, startTimeStamp: string, endTimeStamp: string) {
     const startDate = new Date(startTimeStamp);
-    const endDate = new Date(endTimeStamp);
+    let endDate = new Date(endTimeStamp);
+    endDate.setDate(endDate.getDate() + 1);
+    const now = new Date();
+    if(endDate >= now)
+      endDate = now;
+
     let nodeHealths = await this.nodeHealthRepository.find({
       where: {
         timeStamp: Between(startDate , endDate),

@@ -113,6 +113,18 @@
     .status-cell.error {
       background-color: var(--error-color);
     }
+    .status-cell.lost1 {
+      background-color: #bfb2b0; /* 연한 회색 */
+    }
+    .status-cell.lost2 {
+      background-color: #bfb2b0; /* 연한 회색 */
+    }
+    .status-cell.lost-many {
+      background-color: #bfb2b0; /* 연한 회색 */
+    }
+    .status-cell.empty {
+      background-color: #7c7c7c; /* 연한 회색 */
+    }
     .status-cell.future {
       background-color: #d3d3d3; /* 연한 회색 */
     }
@@ -358,20 +370,8 @@
 <script>
   let endpointUrls; // 내부 변수 선언
   let cellInactiveCount = new Map();
+  let cellLostCount = new Map();
 
-  function createAnimatedCell(className) {
-    const cell = document.createElement('div');
-    cell.className = className;
-    cell.style.transform = 'scale(0)';
-    cell.style.opacity = '0';
-
-    setTimeout(() => {
-      cell.style.transform = 'scale(1)';
-      cell.style.opacity = '1';
-    }, Math.random() * 200);
-
-    return cell;
-  }
 
   async function fetchDistinctEndpoints() {
     try {
@@ -392,6 +392,12 @@
     const odinGrid = document.getElementById('odinGrid');
     const heimdallGrid = document.getElementById('heimdallGrid');
     const tooltip = document.getElementById('tooltip');
+    tooltip.addEventListener('mouseover', () => {
+      clearTimeout(hideTooltipTimeout);
+    });
+
+// 툴팁을 벗어났을 때 숨김
+    tooltip.addEventListener('mouseleave', hideTooltip);
 
     const yearSelect = document.getElementById('yearSelect');
     const monthSelect = document.getElementById('monthSelect');
@@ -411,28 +417,67 @@
     yearSelect.value = now.getFullYear();
     monthSelect.value = String(now.getMonth() + 1).padStart(2, '0');
 
-    // 년월 변경 이벤트
+    yearSelect.addEventListener('change', handleDateChange);
+    monthSelect.addEventListener('change', handleDateChange);
+
+    handleDateChange();
+
     async function handleDateChange() {
       const selectedYear = yearSelect.value;
       const selectedMonth = monthSelect.value;
       const date = new Date(selectedYear, parseInt(selectedMonth) - 1);
 
-      const monthlyData = await fetchMonthlyData(date);
-      if (!monthlyData) return;
+      try {
+        // 모든 데이터를 한 번에 페칭
+        const monthlyData = await fetchMonthlyData(date);
+        const monthlyLostData = await fetchMonthlyLostData(date);
+        const statusData = {
+          odin: Object.values(monthlyData.odin).flat(),
+          heimdall: Object.values(monthlyData.heimdall).flat()
+        };
+        const lostData = {
+          odin: Object.values(monthlyLostData.odin).flat(),
+          heimdall: Object.values(monthlyLostData.heimdall).flat()
+        };
+        if (!monthlyData || !monthlyLostData) return;
 
-      createStatusGrid(odinGrid, monthlyData);
-      createStatusGrid(heimdallGrid, monthlyData);
+        // 그리드 생성 및 데이터 업데이트를 한 번에 처리
+        createStatusGrid(odinGrid, monthlyData);
+        createStatusGrid(heimdallGrid, monthlyData);
 
-      cellInactiveCount.clear();
-      const statusData = {
-        odin: Object.values(monthlyData.odin).flat(),
-        heimdall: Object.values(monthlyData.heimdall).flat()
-      };
-      updateStatusCells(statusData);
+        cellInactiveCount.clear();
+        cellLostCount.clear();
+        // 상태 데이터 업데이트
+
+        // Lost 데이터 업데이트
+
+        if (lostData.odin.length === 0 && lostData.heimdall.length === 0) {
+          updateEmptyCells(odinGrid, monthlyData);
+          updateEmptyCells(heimdallGrid, monthlyData);
+        }
+        else {
+          updateStatusCells(statusData);
+          updateLostCells(lostData);
+        }
+
+      } catch (error) {
+        console.error('Error updating data:', error);
+      }
     }
 
-    yearSelect.addEventListener('change', handleDateChange);
-    monthSelect.addEventListener('change', handleDateChange);
+    function createAnimatedCell(className) {
+      const cell = document.createElement('div');
+      cell.className = className;
+      cell.style.transform = 'scale(0)';
+      cell.style.opacity = '0';
+
+      setTimeout(() => {
+        cell.style.transform = 'scale(1)';
+        cell.style.opacity = '1';
+      }, Math.random() * 200);
+
+      return cell;
+    }
 
     function getMonthRange(date) {
       let month = date.getMonth() + 1; //0 -> 1월
@@ -457,6 +502,28 @@
         const [odinData, heimdallData] = await Promise.all([
           fetch(`/api/status/detail?group=odin&start=${start}&end=${end}`).then(res => res.json()),
           fetch(`/api/status/detail?group=heimdall&start=${start}&end=${end}`).then(res => res.json())
+        ]);
+
+        return {
+          year,
+          month,
+          odin: odinData,
+          heimdall: heimdallData,
+          daysInMonth
+        };
+      } catch (error) {
+        console.error('Error fetching monthly data:', error);
+        return null;
+      }
+    }
+
+    async function fetchMonthlyLostData(date) {
+      const { year, month, start, end, daysInMonth } = getMonthRange(date);
+
+      try {
+        const [odinData, heimdallData] = await Promise.all([
+          fetch(`/api/status/lost?group=odin&start=${start}&end=${end}`).then(res => res.json()),
+          fetch(`/api/status/lost?group=heimdall&start=${start}&end=${end}`).then(res => res.json())
         ]);
 
         return {
@@ -524,6 +591,7 @@
         gridElement.appendChild(dayColumn);
       }
     }
+
     // 열 하이라이트 함수
     function highlightColumn(event) {
       const column = event.currentTarget;
@@ -556,10 +624,12 @@
           }
 
           if (status.active === "false") {
-            const cellData = cellInactiveCount.get(cellId);
-            cellData.count += 1;
-            cellData.statuses.push(status);
-            cellInactiveCount.set(cellId, cellData);
+            if(status.log !== "Libplanet.Action.State.InsufficientBalanceException") { //스케쥴러 오류로 실행안될 경우 돈이 공급이 잘 안될때가 있는데, 어쨋든 요청은 갔으니까 success임.
+              const cellData = cellInactiveCount.get(cellId);
+              cellData.count += 1;
+              cellData.statuses.push(status);
+              cellInactiveCount.set(cellId, cellData);
+            }
           }
         });
       }
@@ -578,8 +648,9 @@
           }
 
           // 툴팁 내용 업데이트
+          let explorerURL = cell.id.includes('odin') ? 'https://9cscan.com/tx/' : 'https://heimdall.9cscan.com/tx/';
           const tooltipContent = data.statuses
-                  .map(s => `Time: ${s.timeStamp}<br>TxHash: ${s.txHash}<br>Log: ${s.log}`)
+                  .map(s => `Time: ${s.timeStamp}<br>TxHash: <a href="${explorerURL}${s.txHash}" target="_blank">${s.txHash}</a><br>Log: ${s.log}`)
                   .join('<br><br>');
 
           cell.setAttribute('data-tooltip', tooltipContent);
@@ -587,7 +658,65 @@
       });
     }
 
+    function updateEmptyCells(gridElement, monthlyData) {
+      for (let day = 1; day <= monthlyData.daysInMonth; day++) {
+        if (day <= 9)
+          day = '0' + day;
+
+        for (let hour = 0; hour < 24; hour++) {
+          if (hour <= 9)
+            hour = '0' + hour;
+          const date = `${monthlyData.year}-${monthlyData.month}-${day}T${hour}`;
+          const cellId = `${gridElement.id}-cell-${date}`;
+          const cell = document.getElementById(cellId);
+          cell.className = 'status-cell empty';
+        }
+      }
+    }
+
+    function updateLostCells(lostData) {
+      for (const [groupName, data] of Object.entries(lostData)) {
+        const gridElement = groupName === 'odin' ? odinGrid : heimdallGrid;
+        data.forEach(status => {
+          const dateStr = status.split('T')[0];
+          let hour = status.split('T')[1];
+
+          const cellId = `${gridElement.id}-cell-${dateStr}T${hour}`;
+
+          if (!cellLostCount.has(cellId)) {
+            cellLostCount.set(cellId, { count: 0, statuses: [] });
+          }
+
+          const cellData = cellLostCount.get(cellId);
+          cellData.count += 1;
+          cellData.statuses.push(status);
+          cellLostCount.set(cellId, cellData);
+        });
+      }
+
+      cellLostCount.forEach((data, cellId) => {
+        const cell = document.getElementById(cellId);
+        if (cell) {
+          if (data.count === 1) {
+            cell.className = 'status-cell lost1';
+          } else if (data.count === 2) {
+            cell.className = 'status-cell lost2';
+          } else if (data.count > 2) {
+            cell.className = 'status-cell lost-many';
+          }
+
+          // 툴팁 내용 업데이트
+          const tooltipContent = data.statuses
+                  .map(s => `Time: ${s}시 Lost`)
+                  .join('<br><br>');
+
+          cell.setAttribute('data-tooltip', tooltipContent);
+        }
+      });
+    }
+    let hideTooltipTimeout;
     function showTooltip(event) {
+      clearTimeout(hideTooltipTimeout);
       const cell = event.target;
       const tooltipContent = cell.getAttribute('data-tooltip');
 
@@ -599,8 +728,13 @@
       }
     }
 
-    function hideTooltip() {
-      tooltip.style.display = 'none';
+    function hideTooltip(event) {
+      hideTooltipTimeout = setTimeout(() => {
+        if (!tooltip.contains(event.relatedTarget)) {
+          tooltip.style.display = 'none'; // 툴팁 숨기기
+        }
+      }, 500); // 200ms 지연 후 툴팁을 숨김
+
     }
 
     function showDetailView(event) {
@@ -622,16 +756,16 @@
                   restUrlEndpoints = restUrlEndpoints.heimdall;
 
                 if (Object.keys(data).length === 0) {
-                  const emptyGrid = createDetailGrid(date, '전체', [])
+                  const emptyGrid = createDetailGrid(group, date, '전체', [])
                   detailGrids.appendChild(emptyGrid);
                 } else {
                   for (const [endpointUrl, statusList] of Object.entries(data)) {
                     restUrlEndpoints = restUrlEndpoints.filter(url => url !== endpointUrl);
-                    const detailGrid = createDetailGrid(date, endpointUrl, statusList);
+                    const detailGrid = createDetailGrid(group, date, endpointUrl, statusList);
                     detailGrids.appendChild(detailGrid);
                   }
                   for (const restUrlEndpoint of restUrlEndpoints) { // 잔여 url 성공 표시위해
-                    const detailGrid = createDetailGrid(date, restUrlEndpoint, []);
+                    const detailGrid = createDetailGrid(group, date, restUrlEndpoint, []);
                     detailGrids.appendChild(detailGrid);
                   }
                 }
@@ -642,7 +776,8 @@
               .catch(error => console.error('Error fetching detail data:', error));
     }
 
-    function createDetailGrid(cellDate, endpointUrl, statusList) {
+    function createDetailGrid(group, cellDate, endpointUrl, statusList) {
+      let explorerURL = group === 'odin' ? 'https://9cscan.com/tx/' : 'https://heimdall.9cscan.com/tx/';
       const gridContainer = document.createElement('div');
       gridContainer.innerHTML = `
           <div class="detail-label-container">
@@ -680,24 +815,44 @@
         }
 
         const currentStatus = statusList.find(status => {
-            const date = new Date(status.timeStamp);
-            date.setHours(date.getHours() - 9); //9시간을 빼줘야 된다.
+          const date = new Date(status.timeStamp);
+          date.setHours(date.getHours() - 9); //9시간을 빼줘야 된다.
 
-            return date.getHours() === hour;
-          });
-        if (currentStatus && currentStatus.active === "false" && currentStatus.log !== "Libplanet.Action.State.InsufficientBalanceException") {
+          return date.getHours() === hour;
+        });
+
+        if (currentStatus && (currentStatus.active === "false" || currentStatus.active === "lost") && currentStatus.log !== "Libplanet.Action.State.InsufficientBalanceException") {
           cell.classList.add('error');
           cell.setAttribute('data-txhash', currentStatus.txHash);
           cell.setAttribute('data-log', currentStatus.log);
 
+
+
           cell.addEventListener('mouseover', (event) => {
-            tooltip.innerHTML = `TxHash: ${currentStatus.txHash}<br>Log: ${currentStatus.log}`;
+            // 기존에 설정된 hideTimeout이 있으면 취소
+            clearTimeout(hideTooltipTimeout);
+
+            tooltip.innerHTML = `TxHash: <a href="${explorerURL}${currentStatus.txHash}" target="_blank">${currentStatus.txHash}</a><br>Log: ${currentStatus.log}`;
             tooltip.style.display = 'block';
             tooltip.style.left = `${event.pageX + 10}px`;
             tooltip.style.top = `${event.pageY + 10}px`;
           });
 
-          cell.addEventListener('mouseout', hideTooltip);
+          cell.addEventListener('mouseout', (event) => {
+            // 툴팁을 바로 숨기지 않고 지연을 줌
+            hideTooltipTimeout = setTimeout(() => {
+              // 마우스가 툴팁 위에 있으면 툴팁을 숨기지 않음
+              if (!tooltip.contains(event.relatedTarget)) {
+                hideTooltip();
+              }
+            }, 300); // 500ms 지연
+          });
+
+          tooltip.addEventListener('mouseover', () => {
+            clearTimeout(hideTooltipTimeout); // 마우스가 툴팁 위에 있으면 숨기지 않음
+          });
+
+          tooltip.addEventListener('mouseleave', hideTooltip); // 마우스가 툴팁에서 벗어나면 숨김
         }
 
         grid.appendChild(cell);
@@ -706,18 +861,6 @@
       gridContainer.appendChild(grid);
       return gridContainer;
     }
-
-    createStatusGrid(odinGrid, getMonthRange(now))
-    createStatusGrid(heimdallGrid, getMonthRange(now));
-
-    fetch('/api/status')
-            .then(response => response.json())
-            .then(data => {
-              updateStatusCells(data);
-            })
-            .catch(error => console.error('Error fetching status data:', error));
-
-
   });
 </script>
 </body>
