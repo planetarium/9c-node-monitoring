@@ -556,6 +556,7 @@
         return {
           year,
           month,
+          day,
           odin: odinData,
           heimdall: heimdallData,
         };
@@ -723,6 +724,17 @@
       }
     }
 
+    function updateEmptyDetailCells(group, dailyData) {
+      for (let hour = 0; hour < 24; hour++) {
+        if (hour <= 9)
+          hour = '0' + hour;
+        const date = `${dailyData.year}-${dailyData.month}-${dailyData.day}T${hour}`;
+        const cellId = `${group}Grid-detail-cell-${date}-전체`;
+        const cell = document.getElementById(cellId);
+        cell.className = 'status-cell empty';
+      }
+    }
+
     function updateLostCells(lostData) {
       for (const [groupName, data] of Object.entries(lostData)) {
         const gridElement = groupName === 'odin' ? odinGrid : heimdallGrid;
@@ -764,7 +776,7 @@
       });
     }
 
-    function updateDetailLostCells(lostData) {
+    function updateLostDetailCells(lostData) {
       for (const [groupName, groupData] of Object.entries(lostData)) {
         const gridElement = groupName === 'odin' ? odinGrid : heimdallGrid;
 
@@ -839,16 +851,17 @@
       const formattedStartDate = date;
       const formattedEndDate = dayjs(date).add(1, 'day').format('YYYY-MM-DD');
 
+      let restUrlEndpoints = endpointUrls;
+      if (group === 'odin')
+        restUrlEndpoints = restUrlEndpoints.odin;
+      else
+        restUrlEndpoints = restUrlEndpoints.heimdall;
+
       fetch(`/api/status/detail?group=${group}&start=${formattedStartDate.split('T')[0]}&end=${formattedEndDate}`)
               .then(response => response.json())
               .then(data => {
                 document.getElementById("date").innerHTML = `${formattedStartDate}일`;
                 detailGrids.innerHTML = '';
-                let restUrlEndpoints = endpointUrls;
-                if (group === 'odin')
-                  restUrlEndpoints = restUrlEndpoints.odin;
-                else
-                  restUrlEndpoints = restUrlEndpoints.heimdall;
 
                 if (Object.keys(data).length === 0) {
                   const emptyGrid = createDetailGrid(group, date, '전체', [])
@@ -873,8 +886,12 @@
       cellLostCount.clear();
       const dailyLostData = await fetchDailyLostData(new Date(date));
       if (!dailyLostData) return;
-
-      updateDetailLostCells(dailyLostData);
+      console.log(dailyLostData);
+      if (Object.keys(dailyLostData.odin).length === 0 && Object.keys(dailyLostData.heimdall).length === 0) {
+        updateEmptyDetailCells(group, dailyLostData);
+      }
+      else
+        updateLostDetailCells(dailyLostData);
     }
 
     function createDetailGrid(group, cellDate, endpointUrl, statusList) {
