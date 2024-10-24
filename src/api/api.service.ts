@@ -18,57 +18,61 @@ import {NodeHealth} from "./db/node-health/node-health";
 export class ApiService {
     private endPointListURL = "https://planets.nine-chronicles.com/planets/";
     private accounts;
-    private instance;
+    private instanceForSend;
+    private instanceForCheck;
 
     constructor(
         private readonly httpService: HttpService,
         private readonly configService: ConfigService,
         private readonly nodeHealthService: NodeHealthService
     ) {
-        this.instance = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
+        this.instanceForSend = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
             httpAgent: new http.Agent({ keepAlive: true }),
             httpsAgent: new https.Agent({ keepAlive: true }),
             timeout: 5000,
         });
-        const addresses = process.env.addresses.split(',');
-        const privatekeys = process.env.privatekeys.split(',');
+        this.instanceForCheck = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
+            httpAgent: new http.Agent({ keepAlive: true }),
+            httpsAgent: new https.Agent({ keepAlive: true }),
+            timeout: 20000,
+        });
         this.accounts = [
             {
-                privateKey: privatekeys[0],
-                address: addresses[0],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_0'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_0'),
             },
             {
-                privateKey: privatekeys[1],
-                address: addresses[1],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_1'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_1'),
             },
             {
-                privateKey: privatekeys[2],
-                address: addresses[2],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_2'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_2'),
             },
             {
-                privateKey: privatekeys[3],
-                address: addresses[3],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_3'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_3'),
             },
             {
-                privateKey: privatekeys[4],
-                address: addresses[4],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_4'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_4'),
             },
             {
-                privateKey: privatekeys[5],
-                address: addresses[5],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_5'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_5'),
             },
             {
-                privateKey: privatekeys[6],
-                address: addresses[6],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_6'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_6'),
             },
             {
-                privateKey: privatekeys[7],
-                address: addresses[7],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_7'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_7'),
             },
             {
-                privateKey: privatekeys[8],
-                address: addresses[8],
-            },
+                privateKey: this.configService.get<string>('PRIVATE_KEY_8'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_8'),
+            }
         ];
     }
 
@@ -104,7 +108,7 @@ export class ApiService {
                 await this.nodeHealthService.savePendingTx(groupName, rpcEndpoints[i], txHash, timeStamp);
             } catch (error) {
                 console.error(`Error sending transaction to ${rpcEndpoints[i]}:`, error.message || error);
-                await this.nodeHealthService.saveInactiveStatus(groupName, rpcEndpoints[i], timeStamp)
+                await this.nodeHealthService.saveLostStatus(groupName, rpcEndpoints[i], timeStamp)
             }
         }
     }
@@ -112,13 +116,17 @@ export class ApiService {
     public async findLostRequest(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
         const allTimestamps = [];
         let current = new Date(startTimeStamp);
-        const end = new Date(endTimeStamp);
+        let end = new Date(endTimeStamp);
+        end.setDate(end.getDate() + 1);
+        const now = new Date();
+        if(end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() + 1 && end >= now)
+            end = now;
+
         // 각 endpoint_url마다 체크
         while (current <= end) {
             allTimestamps.push(current.toISOString());
             current.setMinutes(current.getMinutes() + 1);  // 1분씩 증가
         }
-
         const missingNodesByEndpoint: { [key: string]: NodeHealth[] } = {};
 
         for (const [endpoint_url, data] of Object.entries(groupedData)) {
@@ -130,12 +138,49 @@ export class ApiService {
             });
             const missingNodes: NodeHealth[] = [];
 
-            // 누락된 NodeHealth 객체 찾기
+            // 누락된 timestamp 찾기
             allTimestamps.forEach(timestamp => {
                 if (!timestampMap.has(timestamp))
-                    missingNodes.push({ timeStamp: timestamp } as NodeHealth);                     // 누락된 타임스탬프가 있으면 해당 객체는 존재하지 않음
+                    missingNodes.push(timestamp.split(':')[0]);
             });
+            if (missingNodes.length > 0) {
+                missingNodesByEndpoint[endpoint_url] = missingNodes; // 누락된 노드를 저장
+            }
+            else
+                missingNodesByEndpoint[endpoint_url] = [];
+        }
+        return missingNodesByEndpoint;
+    }
 
+    public async findLostRequestDetail(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
+        const allTimestamps = [];
+        let current = new Date(startTimeStamp);
+        let end = new Date(endTimeStamp);
+        const now = new Date();
+        if(end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() + 1 && end >= now)
+            end = now;
+
+        // 각 endpoint_url마다 체크
+        while (current <= end) {
+            allTimestamps.push(current.toISOString());
+            current.setMinutes(current.getMinutes() + 1);  // 1분씩 증가
+        }
+        const missingNodesByEndpoint: { [key: string]: any[] } = {};
+
+        for (const [endpoint_url, data] of Object.entries(groupedData)) {
+            // 타임스탬프를 기준으로 NodeHealth 객체를 매핑
+            const timestampMap = new Map<string, NodeHealth>();
+            data.forEach(item => {
+                const itemTimestamp = new Date(item.timeStamp).toISOString();
+                timestampMap.set(itemTimestamp, item); // timeStamp를 키로 객체 저장
+            });
+            const missingNodes: string[] = [];
+
+            // 누락된 timestamp 찾기
+            allTimestamps.forEach(timestamp => {
+                if (!timestampMap.has(timestamp))
+                    missingNodes.push(timestamp.split(':')[0] + ':' +timestamp.split(':')[1]);
+            });
             if (missingNodes.length > 0) {
                 missingNodesByEndpoint[endpoint_url] = missingNodes; // 누락된 노드를 저장
             }
@@ -219,7 +264,7 @@ export class ApiService {
 
 
     async nextTxNonce(endpoint: string, address: string): Promise<number> {
-        const {data} = await this.instance.post(endpoint, {
+        const {data} = await this.instanceForSend.post(endpoint, {
             variables: {address},
             query: `
               query getNextTxNonce($address: Address!){
@@ -239,7 +284,7 @@ export class ApiService {
             decimalPlaces: 18
         };
 
-        const { data } = await this.instance.post(endpoint, {
+        const { data } = await this.instanceForSend.post(endpoint, {
             variables: { publicKey, plainValue, nonce, maxGasPrice },
             query: `
                 query unsignedTx($publicKey: String!, $plainValue: String!, $nonce: Long, $maxGasPrice: FungibleAssetValueInputType) {
@@ -252,7 +297,7 @@ export class ApiService {
     }
 
     async signTransaction(endpoint: string, unsignedTx: string, base64Sign: string): Promise<any> {
-        const { data } = await this.instance.post(endpoint, {
+        const { data } = await this.instanceForSend.post(endpoint, {
             "variables": { unsignedTx, signature: base64Sign },
             "query": `
                   query attachSignature($unsignedTx: String!, $signature: String!) {
@@ -266,7 +311,7 @@ export class ApiService {
     }
 
     async stageTx(endpoint: string, payload: string): Promise<{ txId: string }> {
-        const { data } = await this.instance.post(endpoint, {
+        const { data } = await this.instanceForSend.post(endpoint, {
             variables: {payload},
             query: `
             mutation transfer($payload: String!) {
@@ -282,44 +327,65 @@ export class ApiService {
         }
     }
 
-    async getTxStatus(endpoint: string, txId: string) {
-
-        const { data } = await this.instance.post(endpoint, {
-            variables: { txId },
+    async getTxStatus(endpoint: string, txIds: string[]) {
+        const { data } = await this.instanceForCheck.post(endpoint, {
+            variables: { txIds }, // 배열로 전달
             query: `
-                  query getTx {
-                    transaction {
-                      transactionResult(txId: "${txId}") {
+            query getTx {
+                transaction {
+                    transactionResults(txIds: ${JSON.stringify(txIds)}) {
                         txStatus
                         exceptionNames
-                      }
                     }
-                  }
-                `
-        })
-        return data['data']['transaction']['transactionResult'];
+                }
+            }
+        `
+        });
+        return data['data']['transaction']['transactionResults']; // 여러 결과가 배열로 반환됨
     }
 
     async resolvePendingTransactions() {
-        const pendingTransactions = await this.nodeHealthService.getPendingTransactions();
+        const pendingTransactions: Array<{ id: number, endpoint_url: string, txHash: string }> = await this.nodeHealthService.getPendingTransactions(); // 명시적 타입
 
-        for (const row of pendingTransactions) {
-            const status = await this.getTxStatus(row.endpoint_url, row.txHash);
-            const result = {
-                id: row.id,
-                status,
-            };
-
-            if (result.status.txStatus === 'SUCCESS') {
-                await this.nodeHealthService.updateCompletedTx(result.id);
-            } else if (result.status.txStatus === 'STAGING') {
-                await this.nodeHealthService.updateStagingTx(result.id);
-            } else {
-                await this.nodeHealthService.updateFailedTx(result.id, result.status.exceptionNames);
+        // endpoint_url 기준으로 그룹화
+        const groupedTransactions = pendingTransactions.reduce<{ [key: string]: Array<{ id: number, endpoint_url: string, txHash: string }> }>((acc, row) => {
+            if (!acc[row.endpoint_url]) {
+                acc[row.endpoint_url] = [];
             }
-            console.log(result);
+            acc[row.endpoint_url].push(row);
+            return acc;
+        }, {});
+
+        let checkEndpointUrl;
+        // 각 endpoint_url 그룹별로 상태 조회 및 처리
+        for (const [endpoint_url, transactions] of Object.entries(groupedTransactions)) {
+            const txIds = transactions.map(tx => tx.txHash); // 해당 endpoint_url에 해당하는 txHash 배열
+
+            if(endpoint_url.includes("heimdall"))
+                checkEndpointUrl = "https://heimdall-rpc-1.nine-chronicles.com/graphql";
+            else
+                checkEndpointUrl = "https://odin-rpc-2.nine-chronicles.com/graphql";
+
+            const statuses = await this.getTxStatus(checkEndpointUrl, txIds);
+            // 5. 상태별로 처리
+            for (const [index, status] of statuses.entries()) {
+                const row = transactions[index]; // 각 상태에 대응하는 트랜잭션 정보
+                const result = {
+                    id: row.id,
+                    status,
+                };
+
+                if (result.status.txStatus === 'SUCCESS') {
+                    await this.nodeHealthService.updateCompletedTx(result.id);
+                } else if (result.status.txStatus === 'STAGING') {
+                    await this.nodeHealthService.updateStagingTx(result.id);
+                } else {
+                    await this.nodeHealthService.updateFailedTx(result.id, result.status.exceptionNames);
+                }
+            }
         }
     }
+
 
 
 }
