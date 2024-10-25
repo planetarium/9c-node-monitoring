@@ -700,7 +700,7 @@
           // 툴팁 내용 업데이트
           let explorerURL = cell.id.includes('odin') ? 'https://9cscan.com/tx/' : 'https://heimdall.9cscan.com/tx/';
           const tooltipContent = data.statuses
-                  .map(s => `Time: ${s.timeStamp}<br>TxHash: <a href="${explorerURL}${s.txHash}" target="_blank">${s.txHash}</a><br>Log: ${s.log}`)
+                  .map(s => `Time: ${s.timeStamp}<br>TxHash: <a href="${explorerURL}${s.txHash}" style = "color: antiquewhite;" target="_blank">${s.txHash}</a><br>Log: ${s.log}`)
                   .join('<br><br>');
 
           cell.setAttribute('data-tooltip', tooltipContent);
@@ -949,7 +949,7 @@
             // 기존에 설정된 hideTimeout이 있으면 취소
             clearTimeout(hideTooltipTimeout);
 
-            tooltip.innerHTML = `TxHash: <a href="${explorerURL}${currentStatus.txHash}" target="_blank">${currentStatus.txHash}</a><br>Log: ${currentStatus.log}`;
+            tooltip.innerHTML = `TxHash: <a href="${explorerURL}${currentStatus.txHash}" style = "color: antiquewhite;" target="_blank">${currentStatus.txHash}</a><br>Log: ${currentStatus.log}`;
             tooltip.style.display = 'block';
             tooltip.style.left = `${event.pageX + 10}px`;
             tooltip.style.top = `${event.pageY + 10}px`;

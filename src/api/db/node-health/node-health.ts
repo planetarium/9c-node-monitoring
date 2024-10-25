@@ -3,7 +3,8 @@ import {
   Column,
   Entity,
   PrimaryGeneratedColumn,
-  UpdateDateColumn
+  UpdateDateColumn,
+  Index
 } from "typeorm";
 
 @Entity({ name: 'node_health' })
@@ -17,6 +18,7 @@ export class NodeHealth extends BaseEntity {
   @Column()
   endpoint_url: string;
 
+  @Index()
   @Column({ type: 'timestamp' })
   timeStamp: Date;  // 문자열 대신 Date 타입 사용
 

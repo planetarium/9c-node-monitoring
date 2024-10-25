@@ -61,6 +61,20 @@ export class ApiController {
     return await this.apiService.findLostRequest(startTimeStamp, endTimeStamp, groupedData);
   }
 
+  @Get(`/status/lost/detail`)
+  async getLostDetail(@Query("group") group: string, @Query("start") startTimeStamp: string, @Query("end") endTimeStamp: string) {
+    let details = await this.nodeHealthService.getLostDetail(group, startTimeStamp, endTimeStamp);
+    const groupedData = details.reduce((acc, item) => {
+      const endpoint = item.endpoint_url;
+      if (!acc[endpoint]) {
+        acc[endpoint] = [];
+      }
+      acc[endpoint].push(item);
+      return acc;
+    }, {});
+    return await this.apiService.findLostRequestDetail(startTimeStamp, endTimeStamp, groupedData);
+  }
+
   @Get('/distinct-endpoints')
   async getDistinctEndpoints() {
     let endpoints = await this.nodeHealthService.getDistinctEndpoints();
