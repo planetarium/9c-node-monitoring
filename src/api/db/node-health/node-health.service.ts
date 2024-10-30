@@ -7,27 +7,34 @@ import { Not, Between, In, MoreThanOrEqual} from "typeorm"
 export class NodeHealthService {
   constructor(private readonly nodeHealthRepository: NodeHealthRepository) {}
 
-  async savePendingTx(group_name: string, endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
+  async saveTempTx(group_name: string, endpoint_url: string, timeStamp: Date): Promise<void> {
     const nodeHealth = new NodeHealth();
     nodeHealth.timeStamp = timeStamp;
-    nodeHealth.txHash = txHash;
     nodeHealth.group_name = group_name;
     nodeHealth.endpoint_url = endpoint_url;
-    nodeHealth.active = 'pending';
+    nodeHealth.active = 'temp';
     try {
-      await this.nodeHealthRepository.save(nodeHealth);
+      console.log(await this.nodeHealthRepository.save(nodeHealth))
     } catch (error) {
       console.error(error);
     }
   }
 
-  async saveLostStatus(group_name: string, endpoint_url: string, timeStamp: Date): Promise<void> {
-    const nodeHealth = new NodeHealth();
-    nodeHealth.timeStamp = timeStamp;
-    nodeHealth.txHash = '';
-    nodeHealth.group_name = group_name;
-    nodeHealth.endpoint_url = endpoint_url;
-    nodeHealth.active = 'lost';
+  async updateTempTx(endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
+    const nodeHealth = await this.getTempTransactions(endpoint_url, timeStamp)
+    nodeHealth.txHash = txHash;
+    nodeHealth.active = 'pending';
+    try {
+      console.log(await this.nodeHealthRepository.save(nodeHealth));
+    } catch (error) {
+      console.error(error);
+    }
+  }
+
+  async updateFailedTempTx(endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
+    const nodeHealth = await this.getTempTransactions(endpoint_url, timeStamp)
+    nodeHealth.txHash = txHash;
+    nodeHealth.active = 'false';
     try {
       await this.nodeHealthRepository.save(nodeHealth);
     } catch (error) {
@@ -116,6 +123,12 @@ export class NodeHealthService {
     return await this.nodeHealthRepository.find({
       where: { active: In(["pending", "staging"]) },
       select: ["id", "endpoint_url", "txHash"], // 필요한 필드만 선택
+    });
+  }
+
+  async getTempTransactions(endpoint_url: string, timestamp: Date) {
+    return await this.nodeHealthRepository.findOne({
+      where: { active: "temp", timeStamp: timestamp, endpoint_url: endpoint_url },
     });
   }
 

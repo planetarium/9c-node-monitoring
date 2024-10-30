@@ -36,45 +36,43 @@ export class ApiService {
             httpsAgent: new https.Agent({ keepAlive: true }),
             timeout: 20000,
         });
-        const addresses = process.env.addresses.split(',');
-        const privatekeys = process.env.privatekeys.split(',');
         this.accounts = [
             {
-                privateKey: privatekeys[0],
-                address: addresses[0],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_0'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_0'),
             },
             {
-                privateKey: privatekeys[1],
-                address: addresses[1],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_1'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_1'),
             },
             {
-                privateKey: privatekeys[2],
-                address: addresses[2],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_2'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_2'),
             },
             {
-                privateKey: privatekeys[3],
-                address: addresses[3],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_3'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_3'),
             },
             {
-                privateKey: privatekeys[4],
-                address: addresses[4],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_4'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_4'),
             },
             {
-                privateKey: privatekeys[5],
-                address: addresses[5],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_5'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_5'),
             },
             {
-                privateKey: privatekeys[6],
-                address: addresses[6],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_6'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_6'),
             },
             {
-                privateKey: privatekeys[7],
-                address: addresses[7],
+                privateKey: this.configService.get<string>('PRIVATE_KEY_7'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_7'),
             },
             {
-                privateKey: privatekeys[8],
-                address: addresses[8],
-            },
+                privateKey: this.configService.get<string>('PRIVATE_KEY_8'),
+                address: this.configService.get<string>('ACCOUNT_ADDRESS_8'),
+            }
         ];
     }
 
@@ -107,52 +105,74 @@ export class ApiService {
                 const txHash = await this.sendTx(rpcEndpoints[i], action, this.accounts[i]);
                 console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
                 console.log('Sender', sender, 'Recipient', recipient);
-                await this.nodeHealthService.savePendingTx(groupName, rpcEndpoints[i], txHash, timeStamp);
+                await this.nodeHealthService.updateTempTx(rpcEndpoints[i], txHash, timeStamp);
             } catch (error) {
                 console.error(`Error sending transaction to ${rpcEndpoints[i]}:`, error.message || error);
-                await this.nodeHealthService.saveLostStatus(groupName, rpcEndpoints[i], timeStamp)
+                await this.nodeHealthService.updateFailedTempTx(groupName, rpcEndpoints[i], timeStamp)
             }
         }
     }
 
-    public async findLostRequest(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
+    public async saveTemp(groupName: string, rpcEndpoints: string[], timeStamp: Date) {
+        for (let i = 0; i < rpcEndpoints.length; i++) {
+            if(i >= this.accounts.length) //만약 엔드포인트가 훨씬 더 늘어났을 경우 계정 생성 바람.
+                break;
+            await this.nodeHealthService.saveTempTx(groupName, rpcEndpoints[i], timeStamp);
+        }
+    }
+
+    public async findAllLostMinute(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
         const allTimestamps = [];
         let current = new Date(startTimeStamp);
         let end = new Date(endTimeStamp);
         end.setDate(end.getDate() + 1);
         const now = new Date();
-        if(end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() + 1 && end >= now)
-            end = now;
 
-        // 각 endpoint_url마다 체크
+        if (end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() + 1 && end >= now) {
+            end = now;
+        }
+
+        // 각 분마다의 타임스탬프 리스트 생성 (1분 단위)
         while (current <= end) {
             allTimestamps.push(current.toISOString());
-            current.setMinutes(current.getMinutes() + 1);  // 1분씩 증가
+            current.setMinutes(current.getMinutes() + 1);
         }
-        const missingNodesByEndpoint: { [key: string]: NodeHealth[] } = {};
 
+        // 각 endpoint_url에 대한 timestamp를 기록할 Map 생성
+        const endpointTimestamps = new Map<string, Set<string>>();
+
+        // groupedData에서 각 URL과 해당 타임스탬프를 Set에 저장
         for (const [endpoint_url, data] of Object.entries(groupedData)) {
-            // 타임스탬프를 기준으로 NodeHealth 객체를 매핑
-            const timestampMap = new Map<string, NodeHealth>();
-            data.forEach(item => {
-                const itemTimestamp = new Date(item.timeStamp).toISOString();
-                timestampMap.set(itemTimestamp, item); // timeStamp를 키로 객체 저장
-            });
-            const missingNodes: NodeHealth[] = [];
-
-            // 누락된 timestamp 찾기
-            allTimestamps.forEach(timestamp => {
-                if (!timestampMap.has(timestamp))
-                    missingNodes.push(timestamp.split(':')[0]);
-            });
-            if (missingNodes.length > 0) {
-                missingNodesByEndpoint[endpoint_url] = missingNodes; // 누락된 노드를 저장
-            }
-            else
-                missingNodesByEndpoint[endpoint_url] = [];
+            const timestampsSet = new Set<string>();
+            data.forEach(item => timestampsSet.add(new Date(item.timeStamp).toISOString()));
+            endpointTimestamps.set(endpoint_url, timestampsSet);
         }
-        return missingNodesByEndpoint;
+
+        // 모든 URL에 공통으로 존재하는 타임스탬프 찾기. 왜냐면 모든 엔드포인트에 같은 분에 보내지 않았다면 람다가 실행되지 않았기 때문!
+        const commonTimestamps = [];
+
+        for (const timestamp of allTimestamps) { // 각 타임스탬프에 대해 모든 endpoint_url에서 존재 여부 확인
+            let isExist = false;
+
+            // 각 endpoint_url에 대해 현재 timestamp가 존재하는지 확인
+            for (const endpoint_url of endpointTimestamps.keys()) {
+                const timestampsSet = endpointTimestamps.get(endpoint_url);
+
+                // 특정 endpoint_url의 timestamp에 현재 timestamp가 없다면
+                if (timestampsSet?.has(timestamp)) {
+                    isExist = true;
+                    break; // 하나라도 없으면 그 시간에 유실된 게 아니므로, 더 확인할 필요 없음
+                }
+            }
+
+            // 모든 endpoint_url에 해당 timestamp가 존재한다면 commonTimestamps에 추가
+            if (!isExist) {
+                commonTimestamps.push(timestamp);
+            }
+        }
+        return commonTimestamps;
     }
+
 
     public async findLostRequestDetail(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
         const allTimestamps = [];
@@ -168,6 +188,16 @@ export class ApiService {
             current.setMinutes(current.getMinutes() + 1);  // 1분씩 증가
         }
         const missingNodesByEndpoint: { [key: string]: any[] } = {};
+
+        // 각 endpoint_url에 대한 timestamp를 기록할 Map 생성
+        const endpointTimestamps = new Map<string, Set<string>>();
+
+        // groupedData에서 각 URL과 해당 타임스탬프를 Set에 저장
+        for (const [endpoint_url, data] of Object.entries(groupedData)) {
+            const timestampsSet = new Set<string>();
+            data.forEach(item => timestampsSet.add(new Date(item.timeStamp).toISOString()));
+            endpointTimestamps.set(endpoint_url, timestampsSet);
+        }
 
         for (const [endpoint_url, data] of Object.entries(groupedData)) {
             // 타임스탬프를 기준으로 NodeHealth 객체를 매핑
@@ -189,6 +219,7 @@ export class ApiService {
             else
                 missingNodesByEndpoint[endpoint_url] = [];
         }
+        console.log(missingNodesByEndpoint);
         return missingNodesByEndpoint;
     }
 

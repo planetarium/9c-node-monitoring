@@ -18,6 +18,8 @@ export class ApiController {
     const commonTimestamp = new Date();
     commonTimestamp.setSeconds(0, 0);
     commonTimestamp.setHours(commonTimestamp.getHours() + 9);
+    await this.apiService.saveTemp('odin', odinRPCEndpoints, commonTimestamp)
+    await this.apiService.saveTemp('heimdall', heimdallRPCEndpoints, commonTimestamp)
     await this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
     await this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
   }
@@ -58,7 +60,7 @@ export class ApiController {
       acc[endpoint].push(item);
       return acc;
     }, {});
-    return await this.apiService.findLostRequest(startTimeStamp, endTimeStamp, groupedData);
+    return await this.apiService.findAllLostMinute(startTimeStamp, endTimeStamp, groupedData); // 요청 못한 시간 추출하기.
   }
 
   @Get(`/status/lost/detail`)
