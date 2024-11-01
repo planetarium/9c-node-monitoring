@@ -11,7 +11,6 @@ import { ethers } from "ethers"; //"ethers": "^5.5.1";
 import {NodeHealthService} from "./db/node-health/node-health.service";
 import * as https from "node:https";
 import * as http from "node:http";
-import {NodeHealth} from "./db/node-health/node-health";
 
 
 @Injectable()
@@ -174,52 +173,23 @@ export class ApiService {
     }
 
 
-    public async findLostRequestDetail(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
-        const allTimestamps = [];
-        let current = new Date(startTimeStamp);
-        let end = new Date(endTimeStamp);
-        const now = new Date();
-        if(end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() + 1 && end >= now)
-            end = now;
-
-        // 각 endpoint_url마다 체크
-        while (current <= end) {
-            allTimestamps.push(current.toISOString());
-            current.setMinutes(current.getMinutes() + 1);  // 1분씩 증가
-        }
+    public async groupingLostRequestDetail(groupedData: { [key: string]: any[] }) {
         const missingNodesByEndpoint: { [key: string]: any[] } = {};
 
-        // 각 endpoint_url에 대한 timestamp를 기록할 Map 생성
-        const endpointTimestamps = new Map<string, Set<string>>();
-
-        // groupedData에서 각 URL과 해당 타임스탬프를 Set에 저장
         for (const [endpoint_url, data] of Object.entries(groupedData)) {
-            const timestampsSet = new Set<string>();
-            data.forEach(item => timestampsSet.add(new Date(item.timeStamp).toISOString()));
-            endpointTimestamps.set(endpoint_url, timestampsSet);
-        }
-
-        for (const [endpoint_url, data] of Object.entries(groupedData)) {
-            // 타임스탬프를 기준으로 NodeHealth 객체를 매핑
-            const timestampMap = new Map<string, NodeHealth>();
-            data.forEach(item => {
-                const itemTimestamp = new Date(item.timeStamp).toISOString();
-                timestampMap.set(itemTimestamp, item); // timeStamp를 키로 객체 저장
-            });
             const missingNodes: string[] = [];
 
-            // 누락된 timestamp 찾기
-            allTimestamps.forEach(timestamp => {
-                if (!timestampMap.has(timestamp))
-                    missingNodes.push(timestamp.split(':')[0] + ':' +timestamp.split(':')[1]);
+            data.forEach(item => {
+                const timestamp = item.timeStamp.toISOString();
+                missingNodes.push(timestamp.split(':')[0] + ':' + timestamp.split(':')[1]);
             });
+            console.log(endpoint_url, missingNodes);
             if (missingNodes.length > 0) {
                 missingNodesByEndpoint[endpoint_url] = missingNodes; // 누락된 노드를 저장
             }
             else
                 missingNodesByEndpoint[endpoint_url] = [];
         }
-        console.log(missingNodesByEndpoint);
         return missingNodesByEndpoint;
     }
 

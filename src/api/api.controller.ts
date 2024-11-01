@@ -45,7 +45,6 @@ export class ApiController {
       acc[endpoint].push(item);
       return acc;
     }, {});
-
     return groupedData;
   }
 
@@ -74,7 +73,7 @@ export class ApiController {
       acc[endpoint].push(item);
       return acc;
     }, {});
-    return await this.apiService.findLostRequestDetail(startTimeStamp, endTimeStamp, groupedData);
+    return await this.apiService.groupingLostRequestDetail(groupedData);
   }
 
   @Get('/distinct-endpoints')
@@ -87,6 +86,4 @@ export class ApiController {
     distinguishEndpoints['heimdall'] = heimdallURL;
     return distinguishEndpoints;
   }
-
-
 }
