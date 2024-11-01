@@ -64,7 +64,6 @@ export class NodeHealthService {
           n.timeStamp = new Date(n.timeStamp.getTime()); // 9시간 추가
           return n;
         });
-
     return { "odin": odinNodes, "heimdall": heimdallNodes };
   }
 
@@ -104,7 +103,8 @@ export class NodeHealthService {
     let nodeHealths = await this.nodeHealthRepository.find({
       where: {
         timeStamp: Between(startDate , endDate),
-        group_name: group //순서 고려해보자 인덱스
+        group_name: group,
+        active: 'temp'
       }
     });
     return nodeHealths;

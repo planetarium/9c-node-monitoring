@@ -438,7 +438,7 @@
 
       try {
         // 모든 데이터를 한 번에 페칭
-        const monthlyData = await fetchMonthlyData(date);
+        const monthlyData = await fetchMonthlyData(date); //주요 로직
         const monthlyLostData = await fetchMonthlyLostData(date);
         const statusData = {
           odin: Object.values(monthlyData.odin).flat(),
@@ -608,7 +608,10 @@
       if(month <= 9)
         month = '0' + month
 
-      const formattedNow = `${year}-${month}-${now.getDate()}T${now.getHours()}`;
+      let formattedNow = `${year}-${month}-${now.getDate()}T${now.getHours()}`;
+      if(now.getDate() <= 9)
+        formattedNow = `${year}-${month}-0${now.getDate()}T${now.getHours()}`;
+
 
       for (let day = 1; day <= monthlyData.daysInMonth; day++) {
         if(day <= 9)
@@ -667,6 +670,7 @@
 
     function updateStatusCells(statusData) {
       for (const [groupName, data] of Object.entries(statusData)) {
+
         const gridElement = groupName === 'odin' ? odinGrid : heimdallGrid;
 
         data.forEach(status => {
@@ -682,7 +686,7 @@
             cellInactiveCount.set(cellId, { count: 0, statuses: [] });
           }
 
-          if (status.active === "false") { //스케쥴러 오류로 실행안될 경우 돈이 공급이 잘 안될때가 있는데, 어쨋든 요청은 갔으니까 success임.
+          if (status.active === "false") {
               const cellData = cellInactiveCount.get(cellId);
               cellData.count += 1;
               cellData.statuses.push(status);
@@ -780,8 +784,13 @@
     function updateLostDetailCells(lostData) {
       for (const [groupName, groupData] of Object.entries(lostData)) {
         const gridElement = groupName === 'odin' ? odinGrid : heimdallGrid;
-
         for (const [endpointUrl, statuses] of Object.entries(groupData)) {
+          // 배열이 아닌 경우 처리
+          if (!Array.isArray(statuses)) {
+            console.error('statuses is not an array', endpointUrl, statuses);
+            continue; // 이 엔드포인트 건너뛰기
+          }
+
           statuses.forEach(status => {
             const dateStr = status.split('T')[0];
             const hour = status.split('T')[1];
@@ -792,7 +801,6 @@
             if (!cellLostCount.has(cellId)) {
               cellLostCount.set(cellId, { count: 0, statuses: [] });
             }
-
             const cellData = cellLostCount.get(cellId);
             cellData.count += 1;
             cellData.statuses.push(status);
@@ -802,15 +810,14 @@
       }
 
       // cellLostCount에 따라 각 셀 업데이트
-      console.log(cellLostCount);
       cellLostCount.forEach((data, cellId) => {
         const cell = document.getElementById(cellId);
         if (cell) {
-          if (3 <= data.count <= 5) { // 3분 이상 유실
+          if (10 <= data.count <= 20) { // 3분 이상 유실
             cell.className = 'detail-cell lost1';
-          } else if (5 < data.count && data.count < 10) { // 5~9분 이상 유실
+          } else if (20 < data.count && data.count < 30) { // 5~9분 이상 유실
             cell.className = 'detail-cell lost2';
-          } else if (data.count === 10) { // 전부 유실
+          } else if (data.count >= 50) { // 전부 유실
             cell.className = 'detail-cell lost-many';
           }
 
@@ -918,6 +925,8 @@
       const now = new Date();
 
       let today = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate() +'T';
+      if(now.getDate() <= 9)
+        today = now.getFullYear() + '-' + (now.getMonth() + 1) + '-0' + now.getDate() +'T';
       const formattedHour = (now.getHours() <= 9) ? '0' + now.getHours() : now.getHours();
       today += formattedHour;
 
