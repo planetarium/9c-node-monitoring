@@ -120,55 +120,13 @@ export class ApiService {
         }
     }
 
-    public async findAllLostMinute(startTimeStamp: string, endTimeStamp: string, groupedData: { [key: string]: any[] }) {
-        const allTimestamps = [];
-        let current = new Date(startTimeStamp);
-        let end = new Date(endTimeStamp);
-        end.setDate(end.getDate() + 1);
-        const now = new Date();
-
-        if (end.getFullYear() === now.getFullYear() && end.getMonth() === now.getMonth() + 1 && end >= now) {
-            end = now;
-        }
-
-        // 각 분마다의 타임스탬프 리스트 생성 (1분 단위)
-        while (current <= end) {
-            allTimestamps.push(current.toISOString());
-            current.setMinutes(current.getMinutes() + 1);
-        }
-
-        // 각 endpoint_url에 대한 timestamp를 기록할 Map 생성
-        const endpointTimestamps = new Map<string, Set<string>>();
-
+    public async findAllLostMinute(groupedData: { [key: string]: any[] }) {
+        const commonTimestamps = [];
         // groupedData에서 각 URL과 해당 타임스탬프를 Set에 저장
         for (const [endpoint_url, data] of Object.entries(groupedData)) {
-            const timestampsSet = new Set<string>();
-            data.forEach(item => timestampsSet.add(new Date(item.timeStamp).toISOString()));
-            endpointTimestamps.set(endpoint_url, timestampsSet);
+            data.forEach(item => commonTimestamps.push({endpoint_url: endpoint_url, timestamp: new Date(item.timeStamp).toISOString()}));
         }
-
-        // 모든 URL에 공통으로 존재하는 타임스탬프 찾기. 왜냐면 모든 엔드포인트에 같은 분에 보내지 않았다면 람다가 실행되지 않았기 때문!
-        const commonTimestamps = [];
-
-        for (const timestamp of allTimestamps) { // 각 타임스탬프에 대해 모든 endpoint_url에서 존재 여부 확인
-            let isExist = false;
-
-            // 각 endpoint_url에 대해 현재 timestamp가 존재하는지 확인
-            for (const endpoint_url of endpointTimestamps.keys()) {
-                const timestampsSet = endpointTimestamps.get(endpoint_url);
-
-                // 특정 endpoint_url의 timestamp에 현재 timestamp가 없다면
-                if (timestampsSet?.has(timestamp)) {
-                    isExist = true;
-                    break; // 하나라도 없으면 그 시간에 유실된 게 아니므로, 더 확인할 필요 없음
-                }
-            }
-
-            // 모든 endpoint_url에 해당 timestamp가 존재한다면 commonTimestamps에 추가
-            if (!isExist) {
-                commonTimestamps.push(timestamp);
-            }
-        }
+        console.log(commonTimestamps);
         return commonTimestamps;
     }
 
@@ -183,7 +141,6 @@ export class ApiService {
                 const timestamp = item.timeStamp.toISOString();
                 missingNodes.push(timestamp.split(':')[0] + ':' + timestamp.split(':')[1]);
             });
-            console.log(endpoint_url, missingNodes);
             if (missingNodes.length > 0) {
                 missingNodesByEndpoint[endpoint_url] = missingNodes; // 누락된 노드를 저장
             }
