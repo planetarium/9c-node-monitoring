@@ -59,7 +59,7 @@ export class ApiController {
       acc[endpoint].push(item);
       return acc;
     }, {});
-    return await this.apiService.findAllLostMinute(startTimeStamp, endTimeStamp, groupedData); // 요청 못한 시간 추출하기.
+    return await this.apiService.findAllLostMinute(groupedData); // 요청 못한 시간 추출하기.
   }
 
   @Get(`/status/lost/detail`)

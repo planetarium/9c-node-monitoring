@@ -91,7 +91,8 @@ export class NodeHealthService {
     let nodeHealths = await this.nodeHealthRepository.find({
       where: {
         timeStamp: Between(startDate , endDate),
-        group_name: group //순서 고려해보자 인덱스
+        group_name: group, //순서 고려해보자 인덱스
+        active: 'temp'
       }
     });
     return nodeHealths;
