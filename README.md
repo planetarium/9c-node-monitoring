@@ -18,6 +18,120 @@ $ npm install
 $ npm run start:dev
 ```
 
+유의사항
+```
+// 로컬환경
+// api.service.ts 파일의 contstructor에 붙여넣기
+this.accounts = [
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_0'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_0'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_1'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_1'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_2'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_2'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_3'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_3'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_4'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_4'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_5'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_5'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_6'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_6'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_7'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_7'),
+    },
+    {
+        privateKey: this.configService.get<string>('PRIVATE_KEY_8'),
+        address: this.configService.get<string>('ACCOUNT_ADDRESS_8'),
+    }
+];
+
+// api.module.ts에 디비 환경변수값으로 사용하기
+
+TypeOrmModule.forRoot({
+    type: 'mysql',
+    host: 'ninechronicle-monitor.cfwwueuwspfo.ap-northeast-2.rds.amazonaws.com',
+    port: 3306,
+    username: 'xxx',
+    password: 'xxx',
+    database: 'node_health',
+    entities: [NodeHealth],
+    synchronize: true,
+}),
+```
+```
+// 프로덕선 환경 (배포시)
+// api.service.ts 파일의 contstructor에 붙여넣기
+const addresses = process.env.addresses.split(',');
+const privatekeys = process.env.privatekeys.split(',');
+this.accounts = [
+    {
+        privateKey: privatekeys[0],
+        address: addresses[0],
+    },
+    {
+        privateKey: privatekeys[1],
+        address: addresses[1],
+    },
+    {
+        privateKey: privatekeys[2],
+        address: addresses[2],
+    },
+    {
+        privateKey: privatekeys[3],
+        address: addresses[3],
+    },
+    {
+        privateKey: privatekeys[4],
+        address: addresses[4],
+    },
+    {
+        privateKey: privatekeys[5],
+        address: addresses[5],
+    },
+    {
+        privateKey: privatekeys[6],
+        address: addresses[6],
+    },
+    {
+        privateKey: privatekeys[7],
+        address: addresses[7],
+    },
+    {
+        privateKey: privatekeys[8],
+        address: addresses[8],
+    },
+];
+
+// api.module.ts에 디비 환경변수값으로 사용하기 (배포를 위해)
+TypeOrmModule.forRoot({
+  type: 'mysql',
+  host: 'ninechronicle-monitor.cfwwueuwspfo.ap-northeast-2.rds.amazonaws.com',
+  port: 3306,
+  username: process.env.DB_USERNAME,
+  password: process.env.DB_PASSWORD,
+  database: 'node_health',
+  entities: [NodeHealth],
+  synchronize: true,
+}),
+```
+
+
 ## Deployment
 ```
 $ export AWS_PROFILE=gamefi-dev-poweruser
