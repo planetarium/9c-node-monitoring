@@ -1,40 +1,66 @@
 import { Injectable } from "@nestjs/common";
-import { HttpService } from "@nestjs/axios";
+import { Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AxiosError } from "axios";
-import { catchError, firstValueFrom } from "rxjs";
+import axiosRetry from 'axios-retry'; 
 import * as crypto from 'crypto';
-import axios from "axios";
-import * as secp256k1 from "secp256k1"; //"secp256k1": "^5.0.0",
-import { encode, RecordView } from "@planetarium/bencodex"; //"@planetarium/bencodex": "^0.2.2",
-import { ethers } from "ethers"; //"ethers": "^5.5.1";
-import {NodeHealthService} from "./db/node-health/node-health.service";
+import axios, { AxiosInstance } from "axios";
+import * as secp256k1 from "secp256k1"; // "secp256k1": "^5.0.0",
+import { encode, RecordView } from "@planetarium/bencodex"; // "@planetarium/bencodex": "^0.2.2",
+import { ethers } from "ethers"; // "ethers": "^5.5.1";
+import { NodeHealthService } from "./db/node-health/node-health.service";
 import * as https from "node:https";
 import * as http from "node:http";
 
 
 @Injectable()
 export class ApiService {
-    private endPointListURL = "https://planets.nine-chronicles.com/planets/";
+    private readonly MAX_RETRY_COUNT: number = 3;
+    private endPointListURL = 'https://planets.nine-chronicles.com/planets/';
     private accounts;
-    private instanceForSend;
-    private instanceForCheck;
+    private instanceForSend: AxiosInstance;
+    private instanceForCheck: AxiosInstance;
+    private readonly logger = new Logger(ApiService.name);
+    private readonly TIMEOUT = 120000;
+    private readonly MAX_PARALLEL_REQUESTS: number = 4;
 
     constructor(
-        private readonly httpService: HttpService,
         private readonly configService: ConfigService,
         private readonly nodeHealthService: NodeHealthService
     ) {
-        this.instanceForSend = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
+        // 전역 Axios 인스턴스 생성
+        this.instanceForSend = axios.create({
+            timeout: this.TIMEOUT,
             httpAgent: new http.Agent({ keepAlive: true }),
             httpsAgent: new https.Agent({ keepAlive: true }),
-            timeout: 5000,
+            headers: { "Connection": "keep-alive" },
         });
-        this.instanceForCheck = axios.create({ //안정적인 비동기 전송을 위해 keepAlive 활성화
+    
+        axiosRetry(this.instanceForSend, {
+            retries: 7,
+            retryDelay: (retryCount) => {
+                const delay = Math.min(1000 * Math.pow(2, retryCount), 60000);
+                this.logger.warn(`Retrying request... Attempt #${retryCount}, Delay: ${delay}ms`);
+                return delay;
+            },
+            retryCondition: (error: AxiosError) =>
+                axiosRetry.isNetworkOrIdempotentRequestError(error) ||
+                ['ECONNABORTED', 'ECONNRESET', 'ECONNREFUSED'].includes(error.code) ||
+                error.message.includes("timeout") || 
+                (error.response?.status ?? 0) >= 500,
+        });
+        this.instanceForCheck = axios.create({
+            timeout: this.TIMEOUT,
             httpAgent: new http.Agent({ keepAlive: true }),
             httpsAgent: new https.Agent({ keepAlive: true }),
-            timeout: 20000,
+            headers: { "Connection": "keep-alive" },
         });
+
+        // accounts 초기화
+        this.initializeAccounts();
+    }
+          
+    private initializeAccounts() {
         this.accounts = [
             {
                 privateKey: this.configService.get<string>('PRIVATE_KEY_0'),
@@ -75,39 +101,104 @@ export class ApiService {
         ];
     }
 
-    public async getRPCEndPoints() {
-        const {data} = await firstValueFrom(
-            this.httpService.get(this.endPointListURL).pipe(
-                catchError((error: AxiosError) => {
-                    console.log('Error fetching transaction history:', error.message);
-                    throw new Error('An error occurred while fetching transaction history.');
-                }),
-            ),
-        );
-        const odinRPCEndpoints = data[0].rpcEndpoints['headless.gql'];
-        const heimdallRPCEndpoints = data[1].rpcEndpoints['headless.gql'];
-        return [odinRPCEndpoints, heimdallRPCEndpoints];
+    public async getRPCEndPoints(): Promise<[string[], string[]]> {
+        try {
+            const { data } = await this.instanceForSend.get(this.endPointListURL, {
+                timeout: this.TIMEOUT,
+            });
+    
+            if (!data || !Array.isArray(data) || data.length < 2) {
+                throw new Error("Invalid response format from endpoint list API.");
+            }
+    
+            const odinRPCEndpoints = data[0]?.rpcEndpoints?.['headless.gql'] || [];
+            const heimdallRPCEndpoints = data[1]?.rpcEndpoints?.['headless.gql'] || [];
+    
+            if (!odinRPCEndpoints.length || !heimdallRPCEndpoints.length) {
+                throw new Error("Missing endpoints from the response.");
+            }
+    
+            return [odinRPCEndpoints, heimdallRPCEndpoints];
+        } catch (error) {
+            this.logger.error('Error in getRPCEndPoints:', error.message);
+            throw new Error(`Failed to fetch RPC endpoints: ${error.message}`);
+        }
     }
 
-    public async send(groupName: string, rpcEndpoints: string[], timeStamp: Date) {
-        for (let i = 0; i < rpcEndpoints.length; i++) {
-            if(i >= this.accounts.length) //만약 엔드포인트가 훨씬 더 늘어났을 경우 계정 생성 바람.
-                break;
-            const sender =   this.accounts[i].address;
-            const recipient = this.accounts[(i + 1) % rpcEndpoints.length].address; // 다음사람한테 주기.
-            let action;
-            if(groupName === 'odin')
-                action = this.makeTransferInOdin(sender, recipient);
-            else
-                action = this.makeTransferInHeimdall(sender, recipient);
+      async sendWithRetry(groupName: string, rpcEndpoints: string[], timeStamp: Date): Promise<void> {
+        console.log(`Starting sendWithRetry for ${groupName} at ${new Date()}`);
+        const batchedEndpoints = this.chunkArray(rpcEndpoints, this.MAX_PARALLEL_REQUESTS);
+    
+        for (const batch of batchedEndpoints) {
             try {
-                const txHash = await this.sendTx(rpcEndpoints[i], action, this.accounts[i]);
-                console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
-                console.log('Sender', sender, 'Recipient', recipient);
-                await this.nodeHealthService.updateTempTx(rpcEndpoints[i], txHash, timeStamp);
+                await Promise.all(batch.map(async (endpoint, i) => {
+                    if (i >= this.accounts.length) return;
+    
+                    const sender = this.accounts[i].address;
+                    const recipient = this.accounts[(i + 1) % this.accounts.length].address;
+                    const action = groupName === 'odin' 
+                        ? this.makeTransferInOdin(sender, recipient) 
+                        : this.makeTransferInHeimdall(sender, recipient);
+    
+                    const txHash = await this.sendTx(endpoint, action, this.accounts[i]);
+                    console.log('Network', endpoint, 'sendtx', txHash);
+                    await this.nodeHealthService.updateTempTx(endpoint, txHash, timeStamp);
+                }));
             } catch (error) {
-                console.error(`Error sending transaction to ${rpcEndpoints[i]}:`, error.message || error);
-                await this.nodeHealthService.updateFailedTempTx(groupName, rpcEndpoints[i], timeStamp)
+                console.error(`[sendWithRetry] Error while sending batch:`, error.message || error);
+            }
+            await this.delay(500); // Batch 간 지연
+        }
+    }
+    
+
+    private chunkArray(array: any[], size: number): any[][] {
+        return array.reduce((resultArray, item, index) => {
+            const chunkIndex = Math.floor(index / size);
+            if (!resultArray[chunkIndex]) {
+                resultArray[chunkIndex] = [];
+            }
+            resultArray[chunkIndex].push(item);
+            return resultArray;
+        }, []);
+    }
+    
+    
+      private async delay(ms: number): Promise<void> {
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      
+
+      private async send(groupName: string, rpcEndpoints: string[], timeStamp: Date): Promise<void> {
+        // 병렬로 모든 rpcEndpoints에 트랜잭션 전송
+        await Promise.all(rpcEndpoints.map(async (endpoint, i) => {
+            if (i >= this.accounts.length) return;
+
+            const sender = this.accounts[i].address;
+            const recipient = this.accounts[(i + 1) % this.accounts.length].address;
+            const action = groupName === 'odin' ? this.makeTransferInOdin(sender, recipient) : this.makeTransferInHeimdall(sender, recipient);
+
+            try {
+                const txHash = await this.sendTx(endpoint, action, this.accounts[i]);
+                console.log('Network', endpoint, 'sendtx', txHash);
+                await this.nodeHealthService.updateTempTx(endpoint, txHash, timeStamp);
+            } catch (error) {
+                console.error(`Error sending transaction to ${endpoint}:`, error.message || error);
+                throw error;
+            }
+        }));
+    }
+
+    async resolvePendingTransactionsWithRetry(): Promise<void> {
+        for (let retry = 0; retry < this.MAX_RETRY_COUNT; retry++) {
+            try {
+                await this.resolvePendingTransactions();
+                break;
+            } catch (error) {
+                console.error(`[RetryTx] Error resolving pending transactions. Attempt ${retry + 1}`, error.message);
+                if (retry === this.MAX_RETRY_COUNT - 1) throw error;
+                await this.delay(5000 * (retry + 1)); 
             }
         }
     }
@@ -151,25 +242,32 @@ export class ApiService {
     }
 
     private makeTransferInOdin(sender: string, recipient: string) {
-        return Buffer.from(encode(new RecordView({
-            type_id: 'transfer_asset5',
-            values: {
-                amount: [
+        return Buffer.from(
+          encode(
+            new RecordView(
+              {
+                type_id: 'transfer_asset5',
+                values: {
+                  amount: [
                     new RecordView(
-                        {
-                            decimalPlaces: Buffer.from([0x02]),
-                            minters: [this.hexToBuffer("0x47d082a115c63e7b58b1532d20e631538eafadde")],
-                            ticker: "NCG",
-                        },
-                        "text"
+                      {
+                        decimalPlaces: Buffer.from([0x02]),
+                        minters: [this.hexToBuffer('0x47d082a115c63e7b58b1532d20e631538eafadde')],
+                        ticker: 'NCG',
+                      },
+                      'text',
                     ),
                     1n,
-                ],
-                recipient: this.hexToBuffer(recipient),
-                sender: this.hexToBuffer(sender),
-            }
-        }, 'text'))).toString('hex');
-    }
+                  ],
+                  recipient: this.hexToBuffer(recipient),
+                  sender: this.hexToBuffer(sender),
+                },
+              },
+              'text',
+            ),
+          ),
+        ).toString('hex');
+      }
 
     private makeTransferInHeimdall(sender: string, recipient: string) {
         return Buffer.from(encode(new RecordView({
@@ -193,10 +291,8 @@ export class ApiService {
     }
 
     hexToBuffer(hex: string): Buffer {
-        return Buffer.from(
-            ethers.utils.arrayify(hex, { allowMissingPrefix: true })
-        );
-    }
+        return Buffer.from(ethers.utils.arrayify(hex, { allowMissingPrefix: true }));
+      }
 
     pad32(msg: Buffer): Buffer {
         let buf: Buffer;
@@ -213,142 +309,226 @@ export class ApiService {
     async sendTx(endpoint: string, action: string, account): Promise<string | undefined> {
         const wallet = new ethers.Wallet(account.privateKey);
         const nonce = await this.nextTxNonce(endpoint, account.address);
-        const _unsignedTx = await this.unsignedTx(endpoint, wallet.publicKey.slice(2), action, nonce);
-        const unsignedTxId = crypto.createHash('sha256').update(_unsignedTx, 'hex').digest();
+      
+        const unsignedTx = await this.unsignedTx(endpoint, wallet.publicKey.slice(2), action, nonce);
+        const unsignedTxId = crypto.createHash('sha256').update(unsignedTx, 'hex').digest();
         const { signature } = secp256k1.ecdsaSign(this.pad32(unsignedTxId), this.hexToBuffer(wallet.privateKey));
         const sign = Buffer.from(secp256k1.signatureExport(signature));
-        const { data: { transaction: { signTransaction: signTx } } } = await this.signTransaction(endpoint, _unsignedTx, sign.toString('hex'));
+      
+        const { data: { transaction: { signTransaction: signTx } } } = await this.signTransaction(endpoint, unsignedTx, sign.toString('hex'));
+      
         const { txId } = await this.stageTx(endpoint, signTx);
         return txId;
-    }
+      }
+
+      
+
+      
 
 
-    async nextTxNonce(endpoint: string, address: string): Promise<number> {
-        const {data} = await this.instanceForSend.post(endpoint, {
-            variables: {address},
+      async nextTxNonce(endpoint: string, address: string): Promise<number> {
+        const { data } = await this.instanceForSend.post(
+          endpoint,
+          {
+            variables: { address },
             query: `
-              query getNextTxNonce($address: Address!){
-                transaction{
-                    nextTxNonce(address: $address)
+              query getNextTxNonce($address: Address!) {
+                transaction {
+                  nextTxNonce(address: $address)
                 }
               }
-            `})
-        return data["data"]["transaction"]["nextTxNonce"];
-    }
+            `,
+          },
+          { timeout: this.TIMEOUT }
+        );
+        return data.data.transaction.nextTxNonce;
+      }
 
 
-    async unsignedTx(endpoint: string, publicKey: string, plainValue: string, nonce: number): Promise<string> {
+      async unsignedTx(endpoint: string, publicKey: string, plainValue: string, nonce: number): Promise<string> {
         const maxGasPrice: FungibleAssetValue = {
-            quantity: 1,
-            ticker: 'Mead',
-            decimalPlaces: 18
+          quantity: 1,
+          ticker: 'Mead',
+          decimalPlaces: 18,
         };
-
-        const { data } = await this.instanceForSend.post(endpoint, {
+      
+        const { data } = await this.instanceForSend.post(
+          endpoint,
+          {
             variables: { publicKey, plainValue, nonce, maxGasPrice },
             query: `
-                query unsignedTx($publicKey: String!, $plainValue: String!, $nonce: Long, $maxGasPrice: FungibleAssetValueInputType) {
-                  transaction {
-                    unsignedTransaction(publicKey: $publicKey, plainValue: $plainValue nonce: $nonce, maxGasPrice: $maxGasPrice)
-                  }
-                }
-              `})
-        return data["data"]["transaction"]["unsignedTransaction"];
-    }
-
-    async signTransaction(endpoint: string, unsignedTx: string, base64Sign: string): Promise<any> {
-        const { data } = await this.instanceForSend.post(endpoint, {
-            "variables": { unsignedTx, signature: base64Sign },
-            "query": `
-                  query attachSignature($unsignedTx: String!, $signature: String!) {
-                    transaction {
-                      signTransaction(unsignedTransaction: $unsignedTx, signature: $signature)
-                    }
-                  }
-                `
-        })
-        return data;
-    }
-
-    async stageTx(endpoint: string, payload: string): Promise<{ txId: string }> {
-        const { data } = await this.instanceForSend.post(endpoint, {
-            variables: {payload},
-            query: `
-            mutation transfer($payload: String!) {
-              stageTransaction(payload: $payload)
-            }
-          `
-        })
-        try {
-            return {txId: data["data"]["stageTransaction"]};
-        } catch (e) {
-            console.log(e, data);
-            throw e;
-        }
-    }
-
-    async getTxStatus(endpoint: string, txIds: string[]) {
-        const { data } = await this.instanceForCheck.post(endpoint, {
-            variables: { txIds }, // 배열로 전달
-            query: `
-            query getTx {
+              query unsignedTx(
+                $publicKey: String!,
+                $plainValue: String!,
+                $nonce: Long,
+                $maxGasPrice: FungibleAssetValueInputType
+              ) {
                 transaction {
-                    transactionResults(txIds: ${JSON.stringify(txIds)}) {
-                        txStatus
-                        exceptionNames
-                    }
+                  unsignedTransaction(
+                    publicKey: $publicKey,
+                    plainValue: $plainValue,
+                    nonce: $nonce,
+                    maxGasPrice: $maxGasPrice
+                  )
                 }
+              }
+            `,
+          },
+          { timeout: this.TIMEOUT }
+        );
+        return data["data"]["transaction"]["unsignedTransaction"];
+      }
+
+      async signTransaction(endpoint: string, unsignedTx: string, base64Sign: string): Promise<any> {
+        const { data } = await this.instanceForSend.post(
+          endpoint,
+          {
+            variables: { unsignedTx, signature: base64Sign },
+            query: `
+              query attachSignature($unsignedTx: String!, $signature: String!) {
+                transaction {
+                  signTransaction(unsignedTransaction: $unsignedTx, signature: $signature)
+                }
+              }
+            `,
+          },
+          { timeout: this.TIMEOUT }
+        );
+        return data;
+      }
+
+      async stageTx(endpoint: string, payload: string): Promise<{ txId: string }> {
+        try {
+          const { data } = await this.instanceForSend.post(
+            endpoint,
+            {
+              variables: { payload },
+              query: `
+                mutation transfer($payload: String!) {
+                  stageTransaction(payload: $payload)
+                }
+              `,
+            },
+            { timeout: this.TIMEOUT }
+          );
+          return { txId: data["data"]["stageTransaction"] };
+        } catch (e) {
+          console.error(`Error staging transaction at ${endpoint}:`, e.response?.data || e.message);
+          throw new Error(`Transaction staging failed for ${endpoint}. Details: ${e.message}`);
+        }
+      }
+
+      private async getTxStatus(endpoint: string, txIds: string[]): Promise<any[]> {
+        const BATCH_SIZE = 3;
+        const batchedTxIds = this.chunkArray(txIds, BATCH_SIZE);
+        const results = [];
+    
+        for (const batch of batchedTxIds) {
+            try {
+                const { data } = await this.instanceForCheck.post(
+                    endpoint,
+                    {
+                        variables: { txIds: batch },
+                        query: `
+                          query getTx {
+                            transaction {
+                              transactionResults(txIds: ${JSON.stringify(batch)}) {
+                                txStatus
+                                exceptionNames
+                              }
+                            }
+                          }
+                        `,
+                    },
+                    { timeout: this.TIMEOUT }
+                );
+                results.push(...data['data']['transaction']['transactionResults']);
+            } catch (error) {
+                console.error(
+                    `[GetTxStatus] Failed fetching status for Endpoint: ${endpoint}, TxIDs: ${batch}, Status Code: ${error.response?.status}`,
+                    error.response?.data || error.message
+                );
+                await Promise.all(
+                    batch.map(async (txId) => {
+                        const failedTx = await this.nodeHealthService.findTransactionByTxHash(txId);
+                        if (failedTx) {
+                            await this.nodeHealthService.updateFailedTx(failedTx.id, error.message);
+                        }
+                    })
+                );
+                continue; // 오류 발생 시 강제 중단 방지
             }
-        `
-        });
-        return data['data']['transaction']['transactionResults']; // 여러 결과가 배열로 반환됨
+        }
+        return results;
     }
 
-    async resolvePendingTransactions() {
-        const pendingTransactions: Array<{ id: number, endpoint_url: string, txHash: string }> = await this.nodeHealthService.getPendingTransactions(); // 명시적 타입
+      async findTransactionByTxHash(txHash: string) {
+        return await this.nodeHealthService.findTransactionByTxHash(txHash);
+      }
 
-        // endpoint_url 기준으로 그룹화
-        const groupedTransactions = pendingTransactions.reduce<{ [key: string]: Array<{ id: number, endpoint_url: string, txHash: string }> }>((acc, row) => {
-            if (!acc[row.endpoint_url]) {
-                acc[row.endpoint_url] = [];
-            }
-            acc[row.endpoint_url].push(row);
-            return acc;
-        }, {});
 
-        let checkEndpointUrl;
-        // 각 endpoint_url 그룹별로 상태 조회 및 처리
-        for (const [endpoint_url, transactions] of Object.entries(groupedTransactions)) {
-            const txIds = transactions.map(tx => tx.txHash); // 해당 endpoint_url에 해당하는 txHash 배열
 
-            if(endpoint_url.includes("heimdall"))
-                checkEndpointUrl = "https://heimdall-rpc-1.nine-chronicles.com/graphql";
-            else
-                checkEndpointUrl = "https://odin-rpc-2.nine-chronicles.com/graphql";
-
-            const statuses = await this.getTxStatus(checkEndpointUrl, txIds);
-            // 5. 상태별로 처리
-            for (const [index, status] of statuses.entries()) {
-                const row = transactions[index]; // 각 상태에 대응하는 트랜잭션 정보
-                const result = {
-                    id: row.id,
-                    status,
-                };
-
-                if (result.status.txStatus === 'SUCCESS') {
-                    await this.nodeHealthService.updateCompletedTx(result.id);
-                } else if (result.status.txStatus === 'STAGING') {
-                    await this.nodeHealthService.updateStagingTx(result.id);
-                } else {
-                    await this.nodeHealthService.updateFailedTx(result.id, result.status.exceptionNames);
+      async resolvePendingTransactions(): Promise<void> {
+        const pendingTransactions = await this.nodeHealthService.getPendingTransactions();
+    
+        // 엔드포인트별로 트랜잭션 그룹핑
+        const groupedTransactions: Record<string, typeof pendingTransactions> = pendingTransactions.reduce(
+            (acc, row) => {
+                if (!acc[row.endpoint_url]) {
+                    acc[row.endpoint_url] = [];
                 }
+                acc[row.endpoint_url].push(row);
+                return acc;
+            },
+            {} as Record<string, typeof pendingTransactions>
+        );
+    
+        // 엔드포인트별 트랜잭션 확인
+        for (const [endpoint_url, transactions] of Object.entries(groupedTransactions)) {
+            const txIds = transactions.map((tx) => tx.txHash);
+    
+            const checkEndpointUrl = endpoint_url.includes("heimdall")
+                ? "https://heimdall-rpc-1.nine-chronicles.com/graphql"
+                : "https://odin-rpc-2.nine-chronicles.com/graphql";
+    
+            try {
+                // 트랜잭션 확인 병렬 처리 개선
+                await Promise.allSettled(
+                    txIds.map(async (txId, index) => {
+                        try {
+                            const status = await this.getTxStatus(checkEndpointUrl, [txId]);
+                            const transaction = transactions[index];
+    
+                            if (status[0]?.txStatus === "SUCCESS") {
+                                await this.nodeHealthService.updateCompletedTx(transaction.id);
+                                console.log(`[TxStatus] SUCCESS: 트랜잭션 ${txId} 완료 (${checkEndpointUrl})`);
+                            } else if (status[0]?.txStatus === "STAGING") {
+                                await this.nodeHealthService.updateStagingTx(transaction.id);
+                                console.log(`[TxStatus] STAGING: 트랜잭션 ${txId} 스테이징 중 (${checkEndpointUrl})`);
+                            } else {
+                                await this.nodeHealthService.updateFailedTx(
+                                    transaction.id,
+                                    status[0]?.exceptionNames || "알 수 없는 오류"
+                                );
+                                console.error(
+                                    `[TxStatus] FAILED: 트랜잭션 ${txId} 실패 (${checkEndpointUrl}). 사유: ${status[0]?.exceptionNames || "알 수 없음"}`
+                                );
+                            }
+                        } catch (error) {
+                            console.error(`[TxStatus] ERROR: 트랜잭션 ${txId} 확인 실패. 오류: ${error.message}`);
+                            await this.nodeHealthService.updateFailedTx(transactions[index].id, error.message);
+                        }
+                    })
+                );
+    
+                console.log(`[ResolveTx] 트랜잭션 확인 성공 (${checkEndpointUrl})`);
+            } catch (error) {
+                console.error(`[ResolveTx] Final failure after retries for ${endpoint_url}:`, error.message);
             }
         }
     }
-
-
-
-}
+ }
+    
 interface FungibleAssetValue {
     quantity: number;
     ticker: string;

@@ -20,27 +20,57 @@ export class NodeHealthService {
     }
   }
 
-  async updateTempTx(endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
-    const nodeHealth = await this.getTempTransactions(endpoint_url, timeStamp)
-    nodeHealth.txHash = txHash;
-    nodeHealth.active = 'pending';
-    try {
-      console.log(await this.nodeHealthRepository.save(nodeHealth));
-    } catch (error) {
-      console.error(error);
-    }
+  async findTransactionByTxHash(txHash: string) {
+    return await this.nodeHealthRepository.findOne({
+      where: { txHash: txHash },
+    });
   }
 
-  async updateFailedTempTx(endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
-    const nodeHealth = await this.getTempTransactions(endpoint_url, timeStamp)
-    nodeHealth.txHash = txHash;
-    nodeHealth.active = 'false';
-    try {
-      await this.nodeHealthRepository.save(nodeHealth);
-    } catch (error) {
-      console.error(error);
+  async updateTempTx(endpoint_url: string, txHash: string, timeStamp: Date): Promise<void> {
+    let nodeHealth = await this.getTempTransactions(endpoint_url, timeStamp);
+    if (!nodeHealth) {
+        nodeHealth = new NodeHealth(); // 기본값 생성
+        nodeHealth.endpoint_url = endpoint_url;
+        nodeHealth.timeStamp = timeStamp;
+        nodeHealth.group_name = 'unknown'; 
     }
+    if (txHash) {
+        nodeHealth.txHash = txHash;
+    }
+    nodeHealth.active = 'pending';
+    await this.nodeHealthRepository.save(nodeHealth);
+}
+
+async updateFailedTempTx(endpoint_url: string, txHash: string | null, timeStamp: Date): Promise<void> {
+  try {
+      // 트랜잭션 상태 확인
+      let nodeHealth = await this.getTempTransactions(endpoint_url, timeStamp);
+
+      // 없으면 기본값 생성
+      if (!nodeHealth) {
+          nodeHealth = new NodeHealth();
+          nodeHealth.endpoint_url = endpoint_url;
+          nodeHealth.timeStamp = timeStamp;
+          nodeHealth.group_name = 'unknown'; 
+      }
+
+      // txHash가 존재하지 않으면 경고 로그
+      if (!txHash) {
+          console.warn(`No txHash found for endpoint ${endpoint_url} at ${timeStamp}`);
+      } else {
+          nodeHealth.txHash = txHash; // txHash 설정
+      }
+
+      // 상태 업데이트
+      nodeHealth.active = 'false';
+
+      // 데이터베이스 저장
+      await this.nodeHealthRepository.save(nodeHealth);
+      console.log(`Transaction marked as failed for ${endpoint_url}`);
+  } catch (error) {
+      console.error(`Error updating failed transaction for ${endpoint_url}:`, error);
   }
+}
 
   async getStatus() {
     const now = new Date();
@@ -98,6 +128,8 @@ export class NodeHealthService {
     return nodeHealths;
   }
 
+  
+
   async getLostDetail(group: string, startTimeStamp: string, endTimeStamp: string) {
     const startDate = new Date(startTimeStamp);
     const endDate = new Date(endTimeStamp);
@@ -128,21 +160,32 @@ export class NodeHealthService {
   }
 
   async getTempTransactions(endpoint_url: string, timestamp: Date) {
-    return await this.nodeHealthRepository.findOne({
-      where: { active: "temp", timeStamp: timestamp, endpoint_url: endpoint_url },
+    const result = await this.nodeHealthRepository.findOne({
+        where: { active: 'temp', timeStamp: timestamp, endpoint_url: endpoint_url },
     });
-  }
-
-
-  async updateCompletedTx(id:number): Promise<void> {
-    await this.nodeHealthRepository.update(id, { active: 'true' });
-  }
-
-  async updateStagingTx(id:number): Promise<void> {
-    await this.nodeHealthRepository.update(id, { active: 'staging' });
-  }
-
-  async updateFailedTx(id:number, log): Promise<void> {
-    await this.nodeHealthRepository.update(id, { active: 'false', log: log });
-  }
+    if (!result) {
+        console.warn(`No NodeHealth entry found for ${endpoint_url} at ${timestamp}`);
+    }
+    return result;
 }
+
+
+  // 트랜잭션 성공으로 업데이트
+async updateCompletedTx(id: number): Promise<void> {
+  await this.nodeHealthRepository.update(id, { active: 'true' });
+  console.log(`[TxStatus] Transaction ${id} updated to SUCCESS`);
+}
+
+// 트랜잭션 스테이징으로 업데이트
+async updateStagingTx(id: number): Promise<void> {
+  await this.nodeHealthRepository.update(id, { active: 'staging' });
+  console.log(`[TxStatus] Transaction ${id} updated to STAGING`);
+}
+
+// 트랜잭션 실패로 업데이트
+async updateFailedTx(id: number, log: string | null): Promise<void> {
+  await this.nodeHealthRepository.update(id, { active: 'false', log: log });
+  console.error(`[TxStatus] Transaction ${id} failed. Reason: ${log || "Unknown"}`);
+}
+}
+

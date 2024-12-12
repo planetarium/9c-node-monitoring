@@ -1,11 +1,36 @@
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Query, Post, Body } from "@nestjs/common";
 import { ApiService } from "./api.service";
 import {NodeHealthService} from "./db/node-health/node-health.service";
 
 
+interface SendTransactionDto {
+  groupName: string;
+  rpcEndpoints: string[];
+  timeStamp: Date;
+}
+
 @Controller('/api')
 export class ApiController {
-  constructor(private readonly apiService: ApiService, private readonly nodeHealthService: NodeHealthService) {}
+  constructor(
+    private readonly apiService: ApiService,
+    private readonly nodeHealthService: NodeHealthService
+  ) {}
+
+  @Get('/resolve-pending')
+  async resolvePendingTransactions(): Promise<void> {
+    console.log("Resolving pending transactions...");
+    await this.apiService.resolvePendingTransactionsWithRetry();
+    console.log("Pending transactions resolved.");
+  }
+
+
+  @Post('/send-tx')
+  async handleSendTransaction(@Body() body: SendTransactionDto): Promise<void> {
+    const { groupName, rpcEndpoints, timeStamp } = body;
+    console.log(`Received request to send transactions for group: ${groupName}`);
+    await this.apiService.saveTemp(groupName, rpcEndpoints, new Date(timeStamp));
+    await this.apiService.sendWithRetry(groupName, rpcEndpoints, new Date(timeStamp));
+  }
 
   @Get('/endpoint')
   async getRpcEndPoints() {
@@ -13,21 +38,23 @@ export class ApiController {
   }
 
   @Get('/send')
-  async send() {
-    const [ odinRPCEndpoints, heimdallRPCEndpoints ] = await this.apiService.getRPCEndPoints();
+  async send(): Promise<void> {
+    const [odinRPCEndpoints, heimdallRPCEndpoints] = await this.apiService.getRPCEndPoints();
     const commonTimestamp = new Date();
     commonTimestamp.setSeconds(0, 0);
     commonTimestamp.setHours(commonTimestamp.getHours() + 9);
-    await this.apiService.saveTemp('odin', odinRPCEndpoints, commonTimestamp)
-    await this.apiService.saveTemp('heimdall', heimdallRPCEndpoints, commonTimestamp)
-    await this.apiService.send('odin', odinRPCEndpoints, commonTimestamp);
-    await this.apiService.send('heimdall', heimdallRPCEndpoints, commonTimestamp);
+    await this.apiService.saveTemp('odin', odinRPCEndpoints, commonTimestamp);
+    await this.apiService.saveTemp('heimdall', heimdallRPCEndpoints, commonTimestamp);
+    await this.apiService.sendWithRetry('odin', odinRPCEndpoints, commonTimestamp);
+    await this.apiService.sendWithRetry('heimdall', heimdallRPCEndpoints, commonTimestamp);
   }
+  
 
   @Get('/check')
-  async checkTx() {
-    await this.apiService.resolvePendingTransactions();
+  async checkTx(): Promise<void> {
+    await this.apiService.resolvePendingTransactionsWithRetry();
   }
+
 
   @Get('/status')
   async getStatus() {
