@@ -1,0 +1,18 @@
+{
+  "name": "9c-node-status",
+  "version": "1.0.0",
+  "description": "A project to monitor the status of Nine Chronicle RPC nodes by sending and verifying transactions for each node.",
+  "license": "ISC",
+  "author": "Jeong Ho Lee",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "concurrently \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "cd apps/api && npm run start",
+    "dev:web": "cd apps/web && npm run dev"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.1"
+  }
+}
