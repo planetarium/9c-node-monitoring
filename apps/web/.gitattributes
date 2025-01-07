@@ -1,0 +1,22 @@
+# Set all text files to use LF line endings in the repository
+* text=crlf
+
+# Explicitly specify binary files (Git will not modify these)
+*.png binary
+*.jpg binary
+*.exe binary
+*.dll binary
+
+# Ensure JSON, Markdown, and JavaScript files use LF
+*.json text eol=crlf
+*.md text eol=crlf
+*.js text eol=crlf
+*.ts text eol=crlf
+*.tsx text eol=crlf
+*.css text eol=crlf
+*.scss text eol=crlf
+*.html text eol=crlf
+*.txt text eol=crlf
+*.yaml text eol=crlf
+*.yml text eol=crlf
+
