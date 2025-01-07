@@ -25,7 +25,11 @@ export default function DayUptimeSection({
     <div>
       <SectionWrapper backgroundColor="bg-white" isBox={isBox}>
         <div className="pt-2 pb-4">
-          <DayUptimeGraph onBarClick={handleGraphClick} network={networkName} />
+          <DayUptimeGraph
+            onBarClick={handleGraphClick}
+            selectedHour={selectedHour}
+            network={networkName}
+          />
         </div>
         {selectedHour !== null && (
           <div className="pt-6 pb-4">

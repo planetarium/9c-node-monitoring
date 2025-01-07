@@ -9,8 +9,8 @@ export default function UptimeList({ network }: { network: string }) {
         <DayUptimeSection network={network} isBox={false} />
       </div>
       <div className="pb-2">
-        {nodes.map((node) => (
-          <div className="mb-4">
+        {nodes.map((node, index) => (
+          <div className="mb-4" key={index}>
             <DayUptimeSection network={network} node={node} isBox={true} />
           </div>
         ))}

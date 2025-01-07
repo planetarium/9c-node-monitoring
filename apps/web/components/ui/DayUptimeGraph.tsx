@@ -46,12 +46,13 @@ const hoverContentForDay = (item: { label: string; uptime: number }) => {
 export default function DayUptimeGraph({
   onBarClick,
   network,
+  selectedHour,
 }: {
   onBarClick: (hour: number | null) => void;
   network: string;
+  selectedHour: number | null;
 }) {
   const [data, setData] = useState<{ label: string; uptime: number }[]>([]);
-  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     const data = generate24HourData();
@@ -59,8 +60,7 @@ export default function DayUptimeGraph({
   }, []);
 
   const handleToggle = () => {
-    setIsExpanded(!isExpanded);
-    onBarClick(isExpanded ? null : 23); // 펼칠 때는 가장 최근 시간(23시), 접을 때는 null
+    onBarClick(selectedHour ? null : 23);
   };
 
   return (
@@ -70,7 +70,7 @@ export default function DayUptimeGraph({
         <button
           onClick={handleToggle}
           className={`p-1 hover:bg-gray-100 rounded-full transition-transform duration-200 ${
-            isExpanded ? "rotate-90" : "rotate-0"
+            selectedHour ? "rotate-90" : "rotate-0"
           }`}
         >
           <ChevronRightIcon className="w-5 h-5" />
