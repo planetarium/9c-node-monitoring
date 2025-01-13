@@ -1,14 +1,22 @@
 // components/layouts/Tabs.tsx
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Tab from "./Tab";
 import SectionWrapper from "./SectionWrapper";
+import { useTransactionCache } from "@/src/contexts/TransactionCacheContext";
 
-const TABS = ["ODIN", "HEIMDAL"];
+const TABS = ["ODIN", "HEIMDALL"];
 
 export default function Tabs() {
+  const { fetchTransactionDataWithCache } = useTransactionCache();
   const [activeTab, setActiveTab] = useState("ODIN");
+  const [date, setDate] = useState<Date>(new Date());
+  const [tabBackgroundColor, setTabBackgroundColor] = useState("bg-green-500");
+
+  useEffect(() => {
+    fetchTransactionDataWithCache(activeTab, date);
+  }, [activeTab, date, fetchTransactionDataWithCache]);
 
   return (
     <div>
@@ -18,7 +26,7 @@ export default function Tabs() {
             <button
               key={tab}
               className={`${
-                activeTab === tab ? "bg-green-500 " : "bg-gray-200"
+                activeTab === tab ? tabBackgroundColor : "bg-gray-200"
               } font-bold rounded-t-lg py-2 px-2.5 text-gray-800`}
               onClick={() => setActiveTab(tab)}
             >
@@ -27,7 +35,13 @@ export default function Tabs() {
           ))}
         </div>
       </SectionWrapper>
-      <Tab network={activeTab} />
+      <Tab
+        network={activeTab}
+        date={date}
+        setDate={setDate}
+        tabBackgroundColor={tabBackgroundColor}
+        setTabBackgroundColor={setTabBackgroundColor}
+      />
     </div>
   );
 }

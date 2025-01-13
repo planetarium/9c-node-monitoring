@@ -11,3 +11,26 @@ export interface NodeHealth {
   log?: string; // nullable field
   updatedAt: string; // ISO 형식 문자열
 }
+
+export type TransactionData = {
+  // id, updatedAt 제외한 NodeHealth 타입
+  group_name: string;
+  node_name: string;
+  endpoint_url: string;
+  txHash: string;
+  active: "temp" | "false" | "true" | "pending" | "null";
+  log?: string;
+  timeStamp: string;
+};
+
+export type DayUptimeEntry = {
+  hour: number;
+  pending: number;
+  temp: number;
+  false: number;
+  true: number;
+  total: number;
+  null: number;
+};
+
+export type TransactionCache = Record<string, TransactionData[]>;
