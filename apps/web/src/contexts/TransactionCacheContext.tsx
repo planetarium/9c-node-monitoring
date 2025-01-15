@@ -21,11 +21,6 @@ type TransactionCacheProviderProps = {
   children: React.ReactNode;
 };
 
-// 한국 시간 기준 날짜를 `YYYY-MM-DD` 형태로 변환
-const getKoreaDateKey = (date: Date) => {
-  return toTimezoneDateString(date, 9); // "YYYY-MM-DD" 형태
-};
-
 // 한국 시간 기준의 00:00:00 또는 23:59:59를 UTC로 변환
 const formatKoreaDateToUTCDateTime = (date: string, start: string): string => {
   //date는 "YYYY-MM-DD" 형태
@@ -44,7 +39,7 @@ const arrayToDateKeyMap = (
   data: TransactionData[]
 ): Record<string, TransactionData[]> => {
   return data.reduce((acc, item) => {
-    const dateKey = getKoreaDateKey(new Date(item.timeStamp)); // `timeStamp`를 한국 시간 기준 `YYYY-MM-DD`로 변환
+    const dateKey = toTimezoneDateString(new Date(item.timeStamp), 9); // `timeStamp`를 한국 시간 기준 `YYYY-MM-DD`로 변환
     if (!acc[dateKey]) {
       acc[dateKey] = []; // 해당 날짜가 없으면 배열 초기화
     }
@@ -80,17 +75,19 @@ export const TransactionCacheProvider = ({
 
       const dateKeysUntilToday = [prevDate, currentDate, nextDate]
         .filter((d) => d <= today)
-        .map(getKoreaDateKey);
+        .map((d) => toTimezoneDateString(d, 9));
 
       //console.log("dateKeysUntilToday", dateKeysUntilToday);
 
-      const missingDates = dateKeysUntilToday.filter(
-        (dateKey) => !transactionCacheRef.current[dateKey]
+      const datesToFetch = dateKeysUntilToday.filter(
+        (dateKey) =>
+          !transactionCacheRef.current[dateKey] ||
+          (dateKey === toTimezoneDateString(today, 9) &&
+            toTimezoneDateString(currentDate, 9) ===
+              toTimezoneDateString(today, 9)) //오늘 데이터인 경우 fetch 포함
       );
 
-      console.log("missingDates", missingDates);
-
-      if (missingDates.length === 0) {
+      if (datesToFetch.length === 0) {
         return dateKeysUntilToday.reduce<Record<string, TransactionData[]>>(
           (acc, key) => {
             acc[key] = transactionCacheRef.current[key];
@@ -102,11 +99,11 @@ export const TransactionCacheProvider = ({
 
       // 해당 날짜의 범위를 UTC로 변환해 API 요청
       const startDateTime = formatKoreaDateToUTCDateTime(
-        missingDates[0],
+        datesToFetch[0],
         "start"
       ); // 00:00:00
       const endDateTime = formatKoreaDateToUTCDateTime(
-        missingDates[missingDates.length - 1],
+        datesToFetch[datesToFetch.length - 1],
         "end"
       ); // 23:59:59
 
@@ -125,7 +122,7 @@ export const TransactionCacheProvider = ({
       const groupedFetchedData = arrayToDateKeyMap(fetchedData);
 
       // 캐시에 저장
-      missingDates.forEach((date) => {
+      datesToFetch.forEach((date) => {
         if (!transactionCacheRef.current[date]) {
           transactionCacheRef.current[date] = [];
         }

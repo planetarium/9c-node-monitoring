@@ -6,7 +6,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { useState } from "react";
 import { useNodeContext } from "@/src/contexts/NodeContext";
-import { toTimezoneDateString } from "@/src/helper";
+import { toTimezoneDateString, toTimezoneHourNumber } from "@/src/helper";
 
 //TODO : 통계 수집 후 기준 명확화
 const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.5; // 데이터가 50% 이상 없으면 회색
@@ -38,6 +38,7 @@ export default function DayUptimeGraph({
   const { nodeNames } = useNodeContext();
   const nodeNumber = nodeNames?.[network]?.length || 1;
   const maxDataNumber = 60 * nodeNumber;
+  const currentTimezoneHour = toTimezoneHourNumber(date, 9);
 
   const getColorForDay = (dayUptimeData: DayUptimeEntry) => {
     if (
@@ -86,14 +87,22 @@ export default function DayUptimeGraph({
   };
 
   const handleToggle = () => {
-    onBarClick(selectedHour ? null : 23);
+    if (
+      date.toISOString().split("T")[0] ===
+      new Date().toISOString().split("T")[0]
+    ) {
+      onBarClick(selectedHour ? null : currentTimezoneHour);
+      console.log(currentTimezoneHour);
+    } else {
+      onBarClick(selectedHour ? null : 23);
+    }
   };
 
-  const handleDateChange = (newDate: Date, change: "prev" | "next") => {
+  const handleDateChange = (prevDate: Date, change: "prev" | "next") => {
     if (change === "prev") {
-      setDate(new Date(date.getTime() - 24 * 60 * 60 * 1000));
+      setDate(new Date(prevDate.getTime() - 24 * 60 * 60 * 1000));
     } else {
-      setDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
+      setDate(new Date(prevDate.getTime() + 24 * 60 * 60 * 1000));
     }
   };
 

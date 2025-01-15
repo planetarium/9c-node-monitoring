@@ -25,9 +25,7 @@ export default function DayUptimeSection({
   setGlobalSelectedHour: React.Dispatch<React.SetStateAction<number | null>>;
 }) {
   const isSection = !isBox;
-  const [selectedHour, setSelectedHour] = useState<number | null>(
-    isBox ? null : 23 //배너 형태면 최신 분까지 펼쳐서 보여주기 위해 23시로 설정
-  );
+  const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const { transactionCache } = useTransactionCache();
   const { isLoading } = useLoadingContext();
 
