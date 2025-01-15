@@ -1,8 +1,7 @@
 import React, { createContext, useCallback, useContext, useRef } from "react";
 import { TransactionData, TransactionCache } from "@/src/types";
-import { useLoadingContext } from "@/src/contexts/LoadingContext"
-
-const OFFSET_HOURS = 9; // KST는 UTC+9
+import { useLoadingContext } from "@/src/contexts/LoadingContext";
+import { toTimezoneDateString } from "@/src/helper";
 
 type TransactionCacheContextType = {
   transactionCache: TransactionCache;
@@ -24,8 +23,7 @@ type TransactionCacheProviderProps = {
 
 // 한국 시간 기준 날짜를 `YYYY-MM-DD` 형태로 변환
 const getKoreaDateKey = (date: Date) => {
-  const koreaDate = new Date(date.getTime() + OFFSET_HOURS * 60 * 60 * 1000); // UTC+9 변환
-  return koreaDate.toISOString().split("T")[0]; // "YYYY-MM-DD" 형태
+  return toTimezoneDateString(date, 9); // "YYYY-MM-DD" 형태
 };
 
 // 한국 시간 기준의 00:00:00 또는 23:59:59를 UTC로 변환
@@ -136,7 +134,8 @@ export const TransactionCacheProvider = ({
 
       setIsLoading(false);
       return fetchedData;
-    }, [setIsLoading]
+    },
+    [setIsLoading]
   );
 
   return (

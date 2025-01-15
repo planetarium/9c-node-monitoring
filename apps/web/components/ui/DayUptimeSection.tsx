@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useTransactionCache } from "@/src/contexts/TransactionCacheContext";
 import { useLoadingContext } from "@/src/contexts/LoadingContext";
 import { DayUptimeEntry, TransactionData } from "@/src/types";
+import { extractNodeNames } from "@/src/helper";
 
 export default function DayUptimeSection({
   network,
@@ -43,17 +44,11 @@ export default function DayUptimeSection({
     setSelectedHour(globalSelectedHour);
   }, [globalSelectedHour]);
 
-  // 중앙 도메인 이름 추출 함수
-  const extractNodeNames = (url: string): string => {
-    const urlParts = url.split("://")[1].split("."); // "https://subdomain.domain.com/graphql" → ["subdomain", "domain", "com"]
-    return urlParts[0]; // subdomain (ex: "odin-rpc-1")
-  };
-
   const networkName = node ? extractNodeNames(node) : network;
 
   /* 데이터 관리 파트 */
   const dateString = date.toISOString().split("T")[0];
-  const selectedDateData = isLoading? [] : transactionCache[dateString] ?? [];
+  const selectedDateData = isLoading ? [] : transactionCache[dateString] ?? [];
   const filteredData = node
     ? selectedDateData?.filter((item) => item.endpoint_url === node) ?? []
     : selectedDateData?.filter(
@@ -115,9 +110,7 @@ export default function DayUptimeSection({
       <SectionWrapper backgroundColor="bg-white" isBox={isBox}>
         <div className="pt-2 pb-4">
           <DayUptimeGraph
-            onBarClick={
-              isSection ? handleCentralGraphClick : handleGraphClick
-            }
+            onBarClick={isSection ? handleCentralGraphClick : handleGraphClick}
             selectedHour={selectedHour}
             network={networkName}
             date={date}

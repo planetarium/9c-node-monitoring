@@ -3,6 +3,7 @@ import { useTransactionCache } from "@/src/contexts/TransactionCacheContext";
 import { useNodeContext } from "@/src/contexts/NodeContext";
 import { useLoadingContext } from "@/src/contexts/LoadingContext";
 import { useState, useEffect } from "react";
+import { toTimezoneDateString, extractNodeNames } from "@/src/helper";
 
 export default function StatusCard({
   network,
@@ -20,20 +21,12 @@ export default function StatusCard({
   const [falseNodes, setFalseNodes] = useState<string[]>([]);
   const [unknownNodes, setUnknownNodes] = useState<string[]>([]);
 
-  // 중앙 도메인 이름 추출 함수
-  const extractNodeNames = (url: string): string => {
-    const urlParts = url.split("://")[1].split("."); // "https://subdomain.domain.com/graphql" → ["subdomain", "domain", "com"]
-    return urlParts[0]; // subdomain (ex: "odin-rpc-1")
-  };
-
   useEffect(() => {
     // 오늘 날짜
     const today = new Date();
-    const todayDate = new Date(today.getTime() + 9 * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[0];
+    const todayDate = toTimezoneDateString(today, 9);
     // 오늘 날짜의 노드 상태 가져오기
-    const todayStatus = isLoading? [] : transactionCache[todayDate] || [];
+    const todayStatus = isLoading ? [] : transactionCache[todayDate] || [];
     const networkNodeNames = nodeNames[network] || [];
 
     const recentLimit = 5;
@@ -78,7 +71,14 @@ export default function StatusCard({
         : "bg-red-500";
 
     setTabBackgroundColor(backgroundColor);
-  }, [transactionCache, nodeNames, network, setTabBackgroundColor, isLoading]);
+  }, [
+    transactionCache,
+    nodeNames,
+    network,
+    isHealthy,
+    setTabBackgroundColor,
+    isLoading,
+  ]);
 
   const message =
     isHealthy === "unknown"

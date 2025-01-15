@@ -6,6 +6,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { useState } from "react";
 import { useNodeContext } from "@/src/contexts/NodeContext";
+import { toTimezoneDateString } from "@/src/helper";
 
 //TODO : 통계 수집 후 기준 명확화
 const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.5; // 데이터가 50% 이상 없으면 회색
@@ -95,6 +96,7 @@ export default function DayUptimeGraph({
       setDate(new Date(date.getTime() + 24 * 60 * 60 * 1000));
     }
   };
+
   const [hoveredItem, setHoveredItem] = useState<{
     x: number;
     y: number;
@@ -113,7 +115,7 @@ export default function DayUptimeGraph({
           <ArrowLeftCircleIcon className="w-5 h-5" />
         </button>
         <h2 className="text-xl font-semibold">
-          {network} {date.toLocaleDateString()} Uptime
+          {network} {toTimezoneDateString(date, 9)} Uptime
         </h2>
         <button onClick={() => handleDateChange(date, "next")}>
           <ArrowRightCircleIcon className="w-5 h-5" />
