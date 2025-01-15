@@ -1,6 +1,7 @@
 import SectionWrapper from "@/components/layouts/SectionWrapper";
 import { useTransactionCache } from "@/src/contexts/TransactionCacheContext";
 import { useNodeContext } from "@/src/contexts/NodeContext";
+import { useLoadingContext } from "@/src/contexts/LoadingContext";
 import { useState, useEffect } from "react";
 
 export default function StatusCard({
@@ -14,6 +15,7 @@ export default function StatusCard({
 }) {
   const { transactionCache } = useTransactionCache();
   const { nodeNames } = useNodeContext();
+  const { isLoading } = useLoadingContext();
   const [isHealthy, setIsHealthy] = useState("true");
   const [falseNodes, setFalseNodes] = useState<string[]>([]);
   const [unknownNodes, setUnknownNodes] = useState<string[]>([]);
@@ -31,19 +33,11 @@ export default function StatusCard({
       .toISOString()
       .split("T")[0];
     // 오늘 날짜의 노드 상태 가져오기
-    const todayStatus = transactionCache[todayDate];
-
-    //
+    const todayStatus = isLoading? [] : transactionCache[todayDate] || [];
     const networkNodeNames = nodeNames[network] || [];
 
     const recentLimit = 5;
     const recentTime = today.getTime() - recentLimit * 60 * 1000;
-
-    console.log(today);
-    console.log(recentTime);
-
-    console.log(new Date("2025-01-13T14:30:00.000Z"));
-    console.log(new Date("2025-01-13T14:30:00.000Z").getTime());
 
     //5분 이내 데이터 중 가장 최근 데이터 조회
     const lastestNodeStatus = networkNodeNames.map((nodeName) => {
@@ -61,7 +55,9 @@ export default function StatusCard({
     let isHealthyState = "true";
 
     for (const [index, nodeStatus] of lastestNodeStatus.entries()) {
-      if (!nodeStatus) {
+      if (isLoading) {
+        isHealthyState = "true";
+      } else if (!nodeStatus) {
         isHealthyState = "unknown";
         newUnknownNodes.push(networkNodeNames[index]);
       } else if (nodeStatus.active === "false") {
@@ -82,7 +78,7 @@ export default function StatusCard({
         : "bg-red-500";
 
     setTabBackgroundColor(backgroundColor);
-  }, [transactionCache, nodeNames, network, isHealthy, setTabBackgroundColor]);
+  }, [transactionCache, nodeNames, network, setTabBackgroundColor, isLoading]);
 
   const message =
     isHealthy === "unknown"

@@ -1,5 +1,6 @@
 import React, { createContext, useCallback, useContext, useRef } from "react";
 import { TransactionData, TransactionCache } from "@/src/types";
+import { useLoadingContext } from "@/src/contexts/LoadingContext"
 
 const OFFSET_HOURS = 9; // KST는 UTC+9
 
@@ -58,6 +59,8 @@ export const TransactionCacheProvider = ({
   //TODO 추가로 odin, heimdal 둘 다 캐시하고 있으니 성능상 필요하다면 한 쪽만 캐시하도록 수정
   children,
 }: TransactionCacheProviderProps) => {
+  const { setIsLoading } = useLoadingContext();
+
   const transactionCacheRef = useRef<TransactionCache>({}); // 캐시 ref
 
   const fetchTransactionDataWithCache = useCallback(
@@ -110,7 +113,7 @@ export const TransactionCacheProvider = ({
       ); // 23:59:59
 
       const response = await fetch(
-        `http://localhost:4000/transactions/status?group=${group}&start=${startDateTime}&end=${endDateTime}`
+        `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime}&end=${endDateTime}`
       );
 
       if (!response.ok) {
@@ -131,11 +134,9 @@ export const TransactionCacheProvider = ({
         transactionCacheRef.current[date] = groupedFetchedData[date] || [];
       });
 
-      console.log("CONTEXT REF", transactionCacheRef.current);
-
+      setIsLoading(false);
       return fetchedData;
-    },
-    []
+    }, [setIsLoading]
   );
 
   return (

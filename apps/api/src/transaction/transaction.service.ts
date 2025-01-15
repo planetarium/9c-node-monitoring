@@ -35,7 +35,7 @@ export class TransactionService {
       //안정적인 비동기 전송을 위해 keepAlive 활성화
       httpAgent: new http.Agent({ keepAlive: true }),
       httpsAgent: new https.Agent({ keepAlive: true }),
-      timeout: 5000,
+      timeout: 20000,
     });
     this.instanceForCheck = axios.create({
       //안정적인 비동기 전송을 위해 keepAlive 활성화

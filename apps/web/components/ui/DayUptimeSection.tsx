@@ -3,6 +3,7 @@ import DayUptimeGraph from "./DayUptimeGraph";
 import HourUptimeGraph from "./HourUptimeGraph";
 import { useState, useEffect } from "react";
 import { useTransactionCache } from "@/src/contexts/TransactionCacheContext";
+import { useLoadingContext } from "@/src/contexts/LoadingContext";
 import { DayUptimeEntry, TransactionData } from "@/src/types";
 
 export default function DayUptimeSection({
@@ -27,6 +28,7 @@ export default function DayUptimeSection({
     isBox ? null : 23 //배너 형태면 최신 분까지 펼쳐서 보여주기 위해 23시로 설정
   );
   const { transactionCache } = useTransactionCache();
+  const { isLoading } = useLoadingContext();
 
   const handleGraphClick = (hour: number | null) => {
     setSelectedHour((prev) => (prev === hour ? null : hour)); // 같은 시간 클릭 시 닫기
@@ -51,7 +53,7 @@ export default function DayUptimeSection({
 
   /* 데이터 관리 파트 */
   const dateString = date.toISOString().split("T")[0];
-  const selectedDateData = transactionCache[dateString] ?? [];
+  const selectedDateData = isLoading? [] : transactionCache[dateString] ?? [];
   const filteredData = node
     ? selectedDateData?.filter((item) => item.endpoint_url === node) ?? []
     : selectedDateData?.filter(
@@ -113,7 +115,9 @@ export default function DayUptimeSection({
       <SectionWrapper backgroundColor="bg-white" isBox={isBox}>
         <div className="pt-2 pb-4">
           <DayUptimeGraph
-            onBarClick={isSection ? handleCentralGraphClick : handleGraphClick}
+            onBarClick={
+              isSection ? handleCentralGraphClick : handleGraphClick
+            }
             selectedHour={selectedHour}
             network={networkName}
             date={date}
