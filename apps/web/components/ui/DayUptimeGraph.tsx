@@ -9,11 +9,10 @@ import { useNodeContext } from "@/src/contexts/NodeContext";
 import { toTimezoneDateString, toTimezoneHourNumber } from "@/src/helper";
 
 //TODO : 통계 수집 후 기준 명확화
-const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.5; // 데이터가 50% 이상 없으면 회색
-const DAY_UPTIME_TEMP_THRESHOLD = 0.5; // 정보가 50% 이상 없으면 회색
-const DAY_UPTIME_PENDING_THRESHOLD = 0.3; // 경고가 30% 이상 있으면 노란색
-const DAY_UPTIME_NORMAL_THRESHOLD = 0.95; // 정상이 95% 이상 있으면 초록색
-const DAY_UPTIME_WARNING_THRESHOLD = 0.8; // 정상이 80% 이상 있으면 노란색
+const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.34; // 데이터가 34% 이상 없으면 회색
+const DAY_UPTIME_PENDING_THRESHOLD = 0.1; // 지연이 10% 이상 있으면 노란색
+const DAY_UPTIME_ACTIVE_THRESHOLD = 0.966; // 정상이 96.6% 이상 있으면 초록색
+const DAY_UPTIME_WARNING_THRESHOLD = 0.8; // 정상이 85% 이상 있으면 주황색
 
 const barHeight = "40px"; // gap = 10px
 const barWidth = "40px";
@@ -41,20 +40,26 @@ export default function DayUptimeGraph({
   const currentTimezoneHour = toTimezoneHourNumber(date, 9);
 
   const getColorForDay = (dayUptimeData: DayUptimeEntry) => {
-    if (
-      !dayUptimeData ||
-      dayUptimeData.temp > maxDataNumber * DAY_UPTIME_TEMP_THRESHOLD ||
-      dayUptimeData.total < maxDataNumber * DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD
-    )
+    if (!dayUptimeData || dayUptimeData.total === 0)
       return "rgb(229, 231, 235)"; // 회색 (정보 없음)
     else if (
-      dayUptimeData.pending >
-      maxDataNumber * DAY_UPTIME_PENDING_THRESHOLD
+      dayUptimeData.total <
+      maxDataNumber * DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD
     )
-      return "rgb(250, 204, 21)"; // 노란색 (경고)
+      return "rgb(169, 172, 178)"; // 진한 회색 (정보 적음)
+    else if (
+      dayUptimeData.false + dayUptimeData.timeout >
+      dayUptimeData.total * DAY_UPTIME_ACTIVE_THRESHOLD
+    )
+      return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
+    else if (
+      dayUptimeData.pending >
+      dayUptimeData.total * DAY_UPTIME_PENDING_THRESHOLD
+    )
+      return "rgb(169, 172, 178)"; // 진한 회색 (지연 오류)
     else if (
       dayUptimeData.true >=
-      dayUptimeData.total * DAY_UPTIME_NORMAL_THRESHOLD
+      dayUptimeData.total * DAY_UPTIME_ACTIVE_THRESHOLD
     )
       return "rgb(74, 222, 128)"; // 초록색 (정상)
     else if (
@@ -62,7 +67,7 @@ export default function DayUptimeGraph({
       dayUptimeData.total * DAY_UPTIME_WARNING_THRESHOLD
     )
       return "rgb(250, 204, 21)"; // 노란색 (경고)
-    else return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
+    else return "rgb(239, 68, 68)"; // 검은색 (오류). 여기까지 오면 문제가 발생한 것
   };
 
   const hoverContentForDay = (label: string, uptimeData: DayUptimeEntry) => {
@@ -73,7 +78,7 @@ export default function DayUptimeGraph({
           ? `${Math.round((uptimeData.true / uptimeData.total) * 100)}%`
           : "not enough data"
       }`,
-      bottom: `Pending: ${uptimeData.pending}, Temp: ${uptimeData.temp}, False: ${uptimeData.false}, True: ${uptimeData.true}, Null: ${uptimeData.null} Total: ${uptimeData.total}`,
+      bottom: `Total: ${uptimeData.total}, Active: ${uptimeData.true}, Error: ${uptimeData.false}, Timeout: ${uptimeData.timeout}, Pending: ${uptimeData.pending}, Dashboard Failure: ${uptimeData.temp}, Null: ${uptimeData.null}`,
     }; //TODO 데이터 타입에 따라 수정
   };
 

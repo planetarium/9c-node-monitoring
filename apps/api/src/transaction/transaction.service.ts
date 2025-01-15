@@ -16,7 +16,6 @@ import * as https from 'node:https';
 import * as http from 'node:http';
 import * as secp256k1 from 'secp256k1'; //"secp256k1": "^5.0.0",
 import * as crypto from 'crypto';
-import { error } from 'console';
 
 @Injectable()
 export class TransactionService {
@@ -143,18 +142,26 @@ export class TransactionService {
           // 시간 조건부터 보고 진행
           console.log('elapsedTime', elapsedTime);
           if (elapsedTime > 120) {
-            // 2분 이상 STAGING 상태인 경우 실패 처리. 2분 미만일 경우 지연으로 처리?
+            // 2분 이상 STAGING 상태인 경우 timout으로 처리
             console.log(
               `Transaction ${row.txHash} has been staging for ${elapsedTime} seconds. Marking as FAILED.`,
             );
-            await this.updateFailedTx(result.id, {
-              reason: 'Staging timeout',
-              elapsedTime,
-            });
+            await this.updateFailedTx(
+              result.id,
+              {
+                reason: 'Staging timeout',
+                elapsedTime,
+              },
+              true,
+            );
           }
           console.log('updateStagingTx', result.id);
         } else {
-          await this.updateFailedTx(result.id, result.status.exceptionNames);
+          await this.updateFailedTx(
+            result.id,
+            result.status.exceptionNames,
+            false,
+          );
           console.log('updateFailedTx', result.id);
         }
       }
@@ -568,7 +575,11 @@ export class TransactionService {
     await this.transactionsRepository.update(id, { active: 'staging' });
   }
 
-  async updateFailedTx(id: number, log: any): Promise<void> {
+  async updateFailedTx(
+    id: number,
+    log: any,
+    isTimeout: boolean,
+  ): Promise<void> {
     if (!id) {
       throw new Error('Transaction ID is required');
     }
@@ -578,7 +589,7 @@ export class TransactionService {
       : log || 'No log provided';
 
     const result = await this.transactionsRepository.update(id, {
-      active: 'false',
+      active: isTimeout ? 'timeout' : 'false',
       log: formattedLog, // 배열을 문자열로 변환하여 저장
     });
 
@@ -623,3 +634,4 @@ interface Account {
   privateKey: string;
   address: string;
 }
+

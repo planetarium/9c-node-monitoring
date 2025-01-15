@@ -28,8 +28,9 @@ const getColorForHour = (item: TransactionData) => {
   if (item.active === "true") return "rgb(74, 222, 128)"; // 초록색 (정상)
   if (item.active === "temp") return "rgb(189, 193, 199)"; // 회색 (대시보드 실패)
   if (item.active === "false") return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
-  if (item.active === "pending") return "rgb(250, 204, 21)"; // 노란색 (경고)
+  if (item.active === "pending") return "rgb(169, 172, 178)"; // 노란색 (지연 경고)
   if (item.active === "null") return "rgb(229, 231, 235)"; // 연한 회색 (정보 없음)
+  if (item.active === "timeout") return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
 };
 
 const getLabelForHour = (index: number) => {
@@ -53,6 +54,8 @@ const hoverContentForHour = (label: string, item: TransactionData) => {
       ? "pending"
       : item.active === "null"
       ? "no data"
+      : item.active === "timeout"
+      ? "timeout"
       : "failed";
   return `Minute: ${label}, Status: ${message}`;
 };

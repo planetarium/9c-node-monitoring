@@ -60,6 +60,7 @@ export default function DayUptimeSection({
     false: 0,
     true: 0,
     null: 0,
+    timeout: 0,
     total: 0,
   };
 
