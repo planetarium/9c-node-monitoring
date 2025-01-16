@@ -16,6 +16,8 @@ import * as https from 'node:https';
 import * as http from 'node:http';
 import * as secp256k1 from 'secp256k1'; //"secp256k1": "^5.0.0",
 import * as crypto from 'crypto';
+import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
+import e from 'express';
 
 @Injectable()
 export class TransactionService {
@@ -138,7 +140,7 @@ export class TransactionService {
         if (result.status.txStatus === 'SUCCESS') {
           await this.updateCompletedTx(result.id);
           console.log('updateCompletedTx', result.id);
-        } else if (result.status.txStatus === 'STAGING') {
+        } else if (result.status.txStatus === 'STAGING' || result.status.txStatus === 'INCLUDED') {
           // 시간 조건부터 보고 진행
           console.log('elapsedTime', elapsedTime);
           if (elapsedTime > 120) {
@@ -156,13 +158,27 @@ export class TransactionService {
             );
           }
           console.log('updateStagingTx', result.id);
-        } else {
+        } else if (result.status.txStatus === 'INVALID') { // NOT FOUND
           await this.updateFailedTx(
             result.id,
             result.status.exceptionNames,
             false,
           );
           console.log('updateFailedTx', result.id);
+        } else if (result.status.txStatus === 'FAILURE') { 
+          await this.updateFailedTx(
+            result.id,
+            result.status.exceptionNames,
+            false,
+          );
+          console.log('updateFailedTx', result.id);
+        }else {
+          await this.updateFailedTx(
+            result.id,
+            result.status.exceptionNames,
+            false,
+          );
+          console.error('Unexpected status in updatePendingTransactions. STATUS : ', result.status.txStatus, 'id : ' , result.id);
         }
       }
     }
@@ -289,18 +305,37 @@ export class TransactionService {
         }
         console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
         console.log('Sender', sender, 'Recipient', recipient);
-        await this.updateTempTx(rpcEndpoints[i], txHash, timeStamp, 'pending');
+        await this.updateTempTx(rpcEndpoints[i], txHash, timeStamp, 'pending', '');
       } catch (error) {
         console.error(
           `Error sending transaction to ${rpcEndpoints[i]}:`,
           error.message || error,
         );
-        await this.updateTempTx(
-          groupName,
-          rpcEndpoints[i],
-          timeStamp,
-          'failed',
-        );
+        if(this.isErrorLogInclude('socket hang up', error)){    
+          await this.updateTempTx(
+            groupName,
+            rpcEndpoints[i],
+            timeStamp,
+            'false',
+            'failed send request : socket hang up, ' + error.message || error, 
+          );
+        } else if(this.isErrorLogInclude('timeout', error)){    
+          await this.updateTempTx(
+            groupName,
+            rpcEndpoints[i],
+            timeStamp,
+            'false',
+            'failed send request : exceeded 20s, ' + error.message || error, 
+          );
+        } else {
+          await this.updateTempTx(
+            groupName,
+            rpcEndpoints[i],
+            timeStamp,
+            'temp',
+            'failed send request : unknown error, ' + error.message || error, 
+          );
+        }
       }
     }
   }
@@ -490,6 +525,15 @@ export class TransactionService {
     }
   }
 
+  isErrorLogInclude = (log: string, error: any) => {
+    return (
+      error.response?.data?.errors?.includes(log) ||
+      error.response?.data?.includes(log) ||
+      error.message?.includes(log) ||
+      error.includes(log)
+    );
+  };
+
   async getTxStatus(endpoint: string, txIds: string[]) {
     console.log(endpoint, txIds, 'start');
     try {
@@ -515,6 +559,16 @@ export class TransactionService {
         txIds,
         error: e.response?.data?.errors || e.response?.data || e.message,
       });
+      if(this.isErrorLogInclude('socket hang up', e)){
+        //socket hang up
+        //TODO : 실패로 처리할 것인지, 재시도 허용할 것인지 
+        return Array(txIds.length).fill({txStatus: 'STAGING', exceptionNames: ['failed state check request : socket hang up']});  
+      } else if (this.isErrorLogInclude('timeout', e)){
+        return Array(txIds.length).fill({txStatus: 'STAGING', exceptionNames: ['failed state check request : exceeded 20s']});
+      } else {
+        // unknown error
+        return Array(txIds.length).fill({txStatus: 'STAGING', exceptionNames: ['failed state check request : unknown error', e.response?.data?.errors || e.response?.data || e.message]});
+      }
     }
   }
 
@@ -523,6 +577,7 @@ export class TransactionService {
     txHash: string,
     timeStamp: Date,
     state: string,
+    log: string 
   ): Promise<void> {
     const tempTransaction = await this.getTempTransactions(
       endpoint_url,
@@ -530,12 +585,13 @@ export class TransactionService {
     );
     if (!tempTransaction) {
       console.error(
-        `No temp transaction found for endpoint_url: ${endpoint_url}, timeStamp: ${timeStamp}`,
+        `No temp transaction found for endpoint_url:  ${endpoint_url}, timeStamp: ${timeStamp}`,
       );
       return;
     }
     tempTransaction.txHash = txHash;
     tempTransaction.active = state;
+    tempTransaction.log = log || '';
 
     try {
       await this.transactionsRepository.save(tempTransaction);

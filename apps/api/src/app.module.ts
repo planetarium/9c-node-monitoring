@@ -22,7 +22,7 @@ import { TransactionModule } from './transaction/transaction.module';
       database: 'ninechronicles_node_status',
       entities: [Transaction],
       synchronize: true,
-      logging: ['query', 'error', 'warn'], // 쿼리, 에러, 경고 로그만 출력
+      logging: ['error', 'warn'], // 쿼리, 에러, 경고 로그만 출력
       //TODO : 필요없어지면 로깅 끄기
     }),
     TransactionModule,
