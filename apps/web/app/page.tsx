@@ -10,8 +10,8 @@ export default function MainPage() {
   return (
     <LoadingContextProvider>
       <TransactionCacheProvider>
-       <NodeContextProvider>
-          <h1 className="text-2xl font-bold text-center bg-white pb-4 pt-10">
+        <NodeContextProvider>
+          <h1 className="text-2xl font-bold text-center bg-white pb-8 min-[660px]:pb-4 pt-10">
             Network Health Dashboard
           </h1>
           <Tabs />

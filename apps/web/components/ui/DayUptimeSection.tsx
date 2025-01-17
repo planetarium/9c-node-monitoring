@@ -119,7 +119,7 @@ export default function DayUptimeSection({
           />
         </div>
         {node && selectedHour !== null && (
-          <div className="pt-6 pb-4">
+          <div className="pt-4 md:pt-6 pb-4">
             <HourUptimeGraph
               selectedHour={selectedHour}
               network={network}
