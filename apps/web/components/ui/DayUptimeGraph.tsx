@@ -4,7 +4,7 @@ import {
   ArrowLeftCircleIcon,
   ArrowRightCircleIcon,
 } from "@heroicons/react/24/solid";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNodeContext } from "@/src/contexts/NodeContext";
 import { toTimezoneDateString, toTimezoneHourNumber } from "@/src/helper";
 
@@ -13,9 +13,6 @@ const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.34; // 데이터가 34% 이상 �
 const DAY_UPTIME_PENDING_THRESHOLD = 0.1; // 지연이 10% 이상 있으면 노란색
 const DAY_UPTIME_ACTIVE_THRESHOLD = 0.966; // 정상이 96.6% 이상 있으면 초록색
 const DAY_UPTIME_WARNING_THRESHOLD = 0.8; // 정상이 85% 이상 있으면 주황색
-
-const barHeight = "40px"; // gap = 10px
-const barWidth = "40px";
 
 export default function DayUptimeGraph({
   onBarClick,
@@ -38,6 +35,33 @@ export default function DayUptimeGraph({
   const nodeNumber = nodeNames?.[network]?.length || 1;
   const maxDataNumber = 60 * nodeNumber;
   const currentTimezoneHour = toTimezoneHourNumber(date, 9);
+  const [barHeight, setBarHeight] = useState("40px");
+  const [outlineWidth, setOutlineWidth] = useState("3px");
+
+  useEffect(() => {
+    const updateHeight = () => {
+      const width = window.innerWidth;
+      if (width < 410) {
+        setBarHeight("25px");
+        setOutlineWidth("1px");
+      } else if (width < 540) {
+        setBarHeight("30px");
+        setOutlineWidth("1px");
+      } else if (width < 768) {
+        setBarHeight("35px");
+        setOutlineWidth("2px");
+      } else if (width < 1024) {
+        setBarHeight("45px");
+        setOutlineWidth("3px");
+      } else {
+        setBarHeight("50px");
+        setOutlineWidth("3px");
+      }
+    };
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
 
   const getColorForDay = (dayUptimeData: DayUptimeEntry) => {
     if (!dayUptimeData || dayUptimeData.total === 0)
@@ -153,7 +177,7 @@ export default function DayUptimeGraph({
               >
                 <div
                   key={index}
-                  className="rounded cursor-pointer"
+                  className="rounded cursor-pointer w-[10px] min-[410px]:w-[12px] min-[540px]:w-[15px] min-[660px]:w-[19px] md:w-[23px] lg:w-[32px] xl:w-[40px]"
                   onClick={() => onBarClick?.(index)}
                   onMouseEnter={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -165,13 +189,12 @@ export default function DayUptimeGraph({
                   }}
                   onMouseLeave={() => setHoveredItem(null)}
                   style={{
-                    width: barWidth,
                     height: getBarHeightForDay(item),
                     backgroundColor: getColorForDay(item),
                     whiteSpace: "pre-line",
                     outline:
                       selectedHour === index
-                        ? `3px solid rgba(0,0,0,0.6)`
+                        ? `${outlineWidth} solid rgba(0,0,0,0.6)`
                         : "none",
                   }}
                 />

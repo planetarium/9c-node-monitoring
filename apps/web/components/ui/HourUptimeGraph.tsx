@@ -1,5 +1,5 @@
 import { TransactionData } from "@/src/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // const generate60MinuteData = () =>
 //   Array.from({ length: 60 }, (_, i) => {
@@ -20,9 +20,6 @@ import { useState } from "react";
 //     };
 //   });
 
-const barHeight = "30px"; // gap = 10px
-const barWidth = "13px";
-
 const getColorForHour = (item: TransactionData) => {
   //TODO 데이터 타입에 따라 색 기준 결정
   if (item.active === "true") return "rgb(74, 222, 128)"; // 초록색 (정상)
@@ -36,12 +33,6 @@ const getColorForHour = (item: TransactionData) => {
 const getLabelForHour = (index: number) => {
   if (index % 10 === 0 && index !== 0) return `${index}`;
   else return "";
-};
-
-const getBarHeightForHour = (item: TransactionData) => {
-  const hourMinHeight = 30;
-  const isActive = item.active === "true";
-  return isActive ? barHeight : hourMinHeight;
 };
 
 const hoverContentForHour = (label: string, item: TransactionData) => {
@@ -74,6 +65,27 @@ export default function HourUptimeGraph({
     y: number;
     content: string;
   } | null>(null);
+  const [barHeight, setBarHeight] = useState("35px");
+
+  useEffect(() => {
+    const updateHeight = () => {
+      const width = window.innerWidth;
+      if (width < 410) {
+        setBarHeight("20px");
+      } else if (width < 540) {
+        setBarHeight("25px");
+      } else if (width < 768) {
+        setBarHeight("28px");
+      } else if (width < 1024) {
+        setBarHeight("32px");
+      } else {
+        setBarHeight("35px");
+      }
+    };
+    updateHeight();
+    window.addEventListener("resize", updateHeight);
+    return () => window.removeEventListener("resize", updateHeight);
+  }, []);
 
   const explorerURL =
     network === "ODIN"
@@ -108,7 +120,7 @@ export default function HourUptimeGraph({
               >
                 <a
                   key={index}
-                  className="rounded cursor-pointer"
+                  className="rounded cursor-pointer w-[4px] min-[410px]:w-[5px] sm:w-[6px] md:w-[8px] lg:w-[11px] xl:w-[13px]"
                   onMouseEnter={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setHoveredItem({
@@ -125,8 +137,7 @@ export default function HourUptimeGraph({
                   }
                   target="_blank"
                   style={{
-                    width: barWidth,
-                    height: getBarHeightForHour(item),
+                    height: barHeight,
                     backgroundColor: getColorForHour(item),
                   }}
                 />
