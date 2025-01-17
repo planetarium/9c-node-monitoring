@@ -120,7 +120,7 @@ export default function HourUptimeGraph({
               >
                 <a
                   key={index}
-                  className="rounded cursor-pointer w-[4px] min-[410px]:w-[5px] sm:w-[6px] md:w-[8px] lg:w-[11px] xl:w-[13px]"
+                  className="rounded cursor-pointer w-[4px] min-[540px]:w-[5px] sm:w-[6px] md:w-[8px] lg:w-[11px] xl:w-[13px]"
                   onMouseEnter={(e) => {
                     const rect = e.currentTarget.getBoundingClientRect();
                     setHoveredItem({

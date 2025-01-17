@@ -140,11 +140,11 @@ export class TransactionService {
         if (result.status.txStatus === 'SUCCESS') {
           await this.updateCompletedTx(result.id);
           console.log('updateCompletedTx', result.id);
-        } else if (result.status.txStatus === 'STAGING' || result.status.txStatus === 'INCLUDED') {
+        } else if (result.status.txStatus === 'STAGING' || result.status.txStatus === 'INCLUDED' || result.status.txStatus === 'INVALID' ) {
           // 시간 조건부터 보고 진행
-          console.log('elapsedTime', elapsedTime);
-          if (elapsedTime > 120) {
-            // 2분 이상 STAGING 상태인 경우 timout으로 처리
+          console.log('STAGING : state', result.status.txStatus, 'elapsedTime', elapsedTime);
+          if (elapsedTime > 180) {
+            // 3분 이상 STAGING 상태인 경우 timout으로 처리
             console.log(
               `Transaction ${row.txHash} has been staging for ${elapsedTime} seconds. Marking as FAILED.`,
             );
@@ -158,13 +158,6 @@ export class TransactionService {
             );
           }
           console.log('updateStagingTx', result.id);
-        } else if (result.status.txStatus === 'INVALID') { // NOT FOUND
-          await this.updateFailedTx(
-            result.id,
-            result.status.exceptionNames,
-            false,
-          );
-          console.log('updateFailedTx', result.id);
         } else if (result.status.txStatus === 'FAILURE') { 
           await this.updateFailedTx(
             result.id,
@@ -526,14 +519,48 @@ export class TransactionService {
   }
 
   isErrorLogInclude = (log: string, error: any) => {
-    return (
-      error.response?.data?.errors?.includes(log) ||
-      error.response?.data?.includes(log) ||
-      error.message?.includes(log) ||
-      error.includes(log)
-    );
-  };
+    // 에러 객체의 구조와 메시지를 로깅하는 헬퍼 함수
+    const logErrorStructure = (error: any) => {
+      console.log('==== Error Structure Log ====');
+      console.log('Type of error:', typeof error);
 
+      if (typeof error === 'object') {
+        try {
+          console.log('Error JSON:', JSON.stringify(error, null, 2));
+        } catch {
+          console.log('Error toString:', error.toString());
+        }
+      } else {
+        console.log('Error:', error);
+      }
+
+      if (error instanceof Error) {
+        console.log('Error message (from Error object):', error.message);
+      }
+
+      console.log('=============================');
+    };
+
+    // error를 문자열로 변환하는 헬퍼 함수
+    const stringifyError = (error: any): string => {
+      if (typeof error === 'string') {
+        return error; // 이미 문자열이면 그대로 반환
+      }
+      if (error instanceof Error) {
+        return error.message; // Error 객체의 메시지 반환
+      }
+      try {
+        return JSON.stringify(error); // JSON으로 변환
+      } catch {
+        return String(error); // JSON 변환 실패 시 일반 문자열로 변환
+      }
+    };
+
+    // 변환된 문자열을 사용하여 비교
+    const errorString = stringifyError(error);
+    return errorString.includes(log);
+  };
+  
   async getTxStatus(endpoint: string, txIds: string[]) {
     console.log(endpoint, txIds, 'start');
     try {
