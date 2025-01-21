@@ -38,3 +38,4 @@ export class TransactionController {
     return await this.transactionService.getRPCEndpoints();
   }
 }
+

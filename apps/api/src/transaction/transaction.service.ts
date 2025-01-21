@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository, In, Timestamp, MoreThan } from 'typeorm';
 import { Transaction } from './transaction.entity';
+import { AccountService } from 'src/account/account.service';
 
 import { AxiosError } from 'axios/index';
 import { catchError, firstValueFrom } from 'rxjs';
@@ -17,20 +18,25 @@ import * as http from 'node:http';
 import * as secp256k1 from 'secp256k1'; //"secp256k1": "^5.0.0",
 import * as crypto from 'crypto';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
-import e from 'express';
+import e, { response } from 'express';
+import { group } from 'node:console';
 
 @Injectable()
 export class TransactionService {
   private endPointListURL = 'https://planets.nine-chronicles.com/planets/';
-  private accounts;
   private instanceForSend;
   private instanceForCheck;
+  private accounts: Account[] = []; //cached accounts
+  private sendCount = 0;
+  private readonly balanceUpdateThreshold = 5;
+  private isBalanceChecked = false;
 
   constructor(
     @InjectRepository(Transaction) //기본 레포지토리. 복잡한 기능이 필요하다면 커스텀으로 변경하자. readonly
     private transactionsRepository: Repository<Transaction>,
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly accountService: AccountService,
   ) {
     this.instanceForSend = axios.create({
       //안정적인 비동기 전송을 위해 keepAlive 활성화
@@ -44,20 +50,33 @@ export class TransactionService {
       httpsAgent: new https.Agent({ keepAlive: true }),
       timeout: 20000,
     });
-    // 각 account의 환경변수 설정
-    this.accounts = Array.from({ length: 8 }, (_, i) => ({
-      privateKey: this.configService.get<string>(`PRIVATE_KEY_${i}`) as string,
-      address: this.configService.get<string>(`ACCOUNT_ADDRESS_${i}`) as string,
-    }));
+  }
+
+  async onModuleInit(): Promise<void> {
+    // 서비스 초기화 시 계정을 캐싱
+    this.accounts = this.accountService.getAccounts();
+    console.log('Cached accounts:', this.accounts);
   }
 
   /* controller 호출 함수 */
   public async sendTransactionToNodes() {
     // fetch 구현 후 개발 => 그대로 갖고 온 거라 하나씩 테스트하며 진행해야 한다.
 
+    this.sendCount++;
+
+    if (this.sendCount % this.balanceUpdateThreshold === 1) {
+      console.log('send count : ', this.sendCount, 'update balance.');
+      try {
+        await this.accountService.updateAllAccountBalances();
+        this.isBalanceChecked = true; // 한번이라도 체크를 한 경우에만 계좌 배분 시스템 활용
+      } catch (error) {
+        console.error('update balance failed', error);
+      }
+    }
+
     // RPC 엔드포인트 로드
     const [odinRPCEndpoints, heimdallRPCEndpoints] =
-      await this.getRPCEndpoints();
+      await this.getRPCEndpoints(); //TODO 나중에는 캐시로 한 번만 불러오게
 
     // 분 단위 timestamp 생성
     const currentTimeStamp = new Date();
@@ -260,7 +279,7 @@ export class TransactionService {
   }
 
   public async sendAndUpdateStatus(
-    groupName: string,
+    groupName: 'odin' | 'heimdall',
     rpcEndpoints: string[],
     timeStamp: Date,
   ) {
@@ -281,9 +300,10 @@ export class TransactionService {
       //   console.log('More endpoints than accounts');
       // }
       const accountNumber = i % usingAccountNumber;
-      const sender = this.accounts[accountNumber].address;
-      const recipient =
-        this.accounts[(accountNumber + 1) % usingAccountNumber].address; // 다음사람한테 주기.
+      const senderIndex = accountNumber;
+      const recieverIndex = (accountNumber + 1) % usingAccountNumber;
+      const sender = this.accounts[senderIndex].address;
+      const recipient = this.accounts[recieverIndex].address; // 다음사람한테 주기.
       console.log(
         'accountNumber',
         accountNumber,
@@ -293,14 +313,15 @@ export class TransactionService {
         recipient,
       );
       let action;
+      const amount = 1n;
       if (groupName === 'odin')
-        action = this.makeTransferInOdin(sender, recipient, 1n);
-      else action = this.makeTransferInHeimdall(sender, recipient, 1n);
+        action = this.makeTransferInOdin(sender, recipient, amount);
+      else action = this.makeTransferInHeimdall(sender, recipient, amount);
       try {
         const txHash = await this.sendTx(
           rpcEndpoints[i],
           action,
-          this.accounts[i],
+          this.accounts[i], //TODO: 이 계좌를 기반으로 전송된다. senderIndex로 수정해야 한다.
         );
         if (!txHash) {
           console.error(
@@ -310,6 +331,8 @@ export class TransactionService {
         }
         console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
         console.log('Sender', sender, 'Recipient', recipient);
+        this.accountService.updateBalance(groupName, senderIndex, -0.01);
+        this.accountService.updateBalance(groupName, recieverIndex, 0.01);
         await this.updateTempTx(
           rpcEndpoints[i],
           txHash,
@@ -443,7 +466,7 @@ export class TransactionService {
     account: Account,
   ): Promise<string | undefined> {
     const wallet = new ethers.Wallet(account.privateKey);
-    const nonce = await this.nextTxNonce(endpoint, account.address);
+    const nonce = await this.nextTxNonce(endpoint, account.address); //nonce는 전송 account를 기준으로 결정된다.
     console.log('endpoint', endpoint, 'account', account.address);
     console.log('nonce', nonce);
     const _unsignedTx = await this.unsignedTx(
@@ -727,7 +750,6 @@ export class TransactionService {
       console.warn(`No transaction found with ID ${id}`);
     }
   }
-
 }
 
 interface FungibleAssetValue {
