@@ -140,9 +140,18 @@ export class TransactionService {
         if (result.status.txStatus === 'SUCCESS') {
           await this.updateCompletedTx(result.id);
           console.log('updateCompletedTx', result.id);
-        } else if (result.status.txStatus === 'STAGING' || result.status.txStatus === 'INCLUDED' || result.status.txStatus === 'INVALID' ) {
+        } else if (
+          result.status.txStatus === 'STAGING' ||
+          result.status.txStatus === 'INCLUDED' ||
+          result.status.txStatus === 'INVALID'
+        ) {
           // 시간 조건부터 보고 진행
-          console.log('STAGING : state', result.status.txStatus, 'elapsedTime', elapsedTime);
+          console.log(
+            'STAGING : state',
+            result.status.txStatus,
+            'elapsedTime',
+            elapsedTime,
+          );
           if (elapsedTime > 180) {
             // 3분 이상 STAGING 상태인 경우 timout으로 처리
             console.log(
@@ -150,28 +159,30 @@ export class TransactionService {
             );
             await this.updateFailedTx(
               result.id,
-              {
-                reason: 'Staging timeout',
-                elapsedTime,
-              },
+              ['Staging timeout', elapsedTime.toString()],
               true,
             );
           }
           console.log('updateStagingTx', result.id);
-        } else if (result.status.txStatus === 'FAILURE') { 
+        } else if (result.status.txStatus === 'FAILURE') {
           await this.updateFailedTx(
             result.id,
             result.status.exceptionNames,
             false,
           );
           console.log('updateFailedTx', result.id);
-        }else {
+        } else {
           await this.updateFailedTx(
             result.id,
             result.status.exceptionNames,
             false,
           );
-          console.error('Unexpected status in updatePendingTransactions. STATUS : ', result.status.txStatus, 'id : ' , result.id);
+          console.error(
+            'Unexpected status in updatePendingTransactions. STATUS : ',
+            result.status.txStatus,
+            'id : ',
+            result.id,
+          );
         }
       }
     }
@@ -264,6 +275,7 @@ export class TransactionService {
     }
     console.log('rpcEndpoints.length', rpcEndpoints.length);
     console.log('usingAccountNumber', usingAccountNumber);
+
     for (let i = 0; i < rpcEndpoints.length; i++) {
       // if (i >= this.accounts.length) { // 기존 코드는 그냥 length 조건으로 활용
       //   console.log('More endpoints than accounts');
@@ -282,8 +294,8 @@ export class TransactionService {
       );
       let action;
       if (groupName === 'odin')
-        action = this.makeTransferInOdin(sender, recipient);
-      else action = this.makeTransferInHeimdall(sender, recipient);
+        action = this.makeTransferInOdin(sender, recipient, 1n);
+      else action = this.makeTransferInHeimdall(sender, recipient, 1n);
       try {
         const txHash = await this.sendTx(
           rpcEndpoints[i],
@@ -298,42 +310,52 @@ export class TransactionService {
         }
         console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
         console.log('Sender', sender, 'Recipient', recipient);
-        await this.updateTempTx(rpcEndpoints[i], txHash, timeStamp, 'pending', '');
+        await this.updateTempTx(
+          rpcEndpoints[i],
+          txHash,
+          timeStamp,
+          'pending',
+          '',
+        );
       } catch (error) {
         console.error(
           `Error sending transaction to ${rpcEndpoints[i]}:`,
           error.message || error,
         );
-        if(this.isErrorLogInclude('socket hang up', error)){    
+        if (this.isErrorLogInclude('socket hang up', error)) {
           await this.updateTempTx(
-            groupName,
             rpcEndpoints[i],
+            '',
             timeStamp,
             'false',
-            'failed send request : socket hang up, ' + error.message || error, 
+            'failed send request : socket hang up, ' + error.message || error,
           );
-        } else if(this.isErrorLogInclude('timeout', error)){    
+        } else if (this.isErrorLogInclude('timeout', error)) {
           await this.updateTempTx(
-            groupName,
             rpcEndpoints[i],
+            '',
             timeStamp,
             'false',
-            'failed send request : exceeded 20s, ' + error.message || error, 
+            'failed send request : exceeded 20s, ' + error.message || error,
           );
         } else {
           await this.updateTempTx(
-            groupName,
             rpcEndpoints[i],
+            '',
             timeStamp,
             'temp',
-            'failed send request : unknown error, ' + error.message || error, 
+            'failed send request : unknown error, ' + error.message || error,
           );
         }
       }
     }
   }
 
-  private makeTransferInOdin(sender: string, recipient: string) {
+  private makeTransferInOdin(
+    sender: string,
+    recipient: string,
+    amount: bigint,
+  ) {
     return Buffer.from(
       encode(
         new RecordView(
@@ -353,7 +375,7 @@ export class TransactionService {
                   },
                   'text',
                 ),
-                1n,
+                amount,
               ],
               recipient: this.hexToBuffer(recipient),
               sender: this.hexToBuffer(sender),
@@ -365,7 +387,11 @@ export class TransactionService {
     ).toString('hex');
   }
 
-  private makeTransferInHeimdall(sender: string, recipient: string) {
+  private makeTransferInHeimdall(
+    sender: string,
+    recipient: string,
+    amount: bigint,
+  ) {
     return Buffer.from(
       encode(
         new RecordView(
@@ -381,7 +407,7 @@ export class TransactionService {
                   },
                   'text',
                 ),
-                1n,
+                amount,
               ],
               recipient: this.hexToBuffer(recipient),
               sender: this.hexToBuffer(sender),
@@ -560,7 +586,7 @@ export class TransactionService {
     const errorString = stringifyError(error);
     return errorString.includes(log);
   };
-  
+
   async getTxStatus(endpoint: string, txIds: string[]) {
     console.log(endpoint, txIds, 'start');
     try {
@@ -586,15 +612,27 @@ export class TransactionService {
         txIds,
         error: e.response?.data?.errors || e.response?.data || e.message,
       });
-      if(this.isErrorLogInclude('socket hang up', e)){
+      if (this.isErrorLogInclude('socket hang up', e)) {
         //socket hang up
-        //TODO : 실패로 처리할 것인지, 재시도 허용할 것인지 
-        return Array(txIds.length).fill({txStatus: 'STAGING', exceptionNames: ['failed state check request : socket hang up']});  
-      } else if (this.isErrorLogInclude('timeout', e)){
-        return Array(txIds.length).fill({txStatus: 'STAGING', exceptionNames: ['failed state check request : exceeded 20s']});
+        //TODO : 실패로 처리할 것인지, 재시도 허용할 것인지
+        return Array(txIds.length).fill({
+          txStatus: 'STAGING',
+          exceptionNames: ['failed state check request : socket hang up'],
+        });
+      } else if (this.isErrorLogInclude('timeout', e)) {
+        return Array(txIds.length).fill({
+          txStatus: 'STAGING',
+          exceptionNames: ['failed state check request : exceeded 20s'],
+        });
       } else {
         // unknown error
-        return Array(txIds.length).fill({txStatus: 'STAGING', exceptionNames: ['failed state check request : unknown error', e.response?.data?.errors || e.response?.data || e.message]});
+        return Array(txIds.length).fill({
+          txStatus: 'STAGING',
+          exceptionNames: [
+            'failed state check request : unknown error',
+            e.response?.data?.errors || e.response?.data || e.message,
+          ],
+        });
       }
     }
   }
@@ -604,7 +642,7 @@ export class TransactionService {
     txHash: string,
     timeStamp: Date,
     state: string,
-    log: string 
+    log: string,
   ): Promise<void> {
     const tempTransaction = await this.getTempTransactions(
       endpoint_url,
@@ -612,9 +650,14 @@ export class TransactionService {
     );
     if (!tempTransaction) {
       console.error(
-        `No temp transaction found for endpoint_url:  ${endpoint_url}, timeStamp: ${timeStamp}`,
+        `PROBLEM! No temp transaction found for endpoint_url:  ${endpoint_url}, timeStamp: ${timeStamp}`,
       );
       return;
+    }
+    if (state !== 'pending') {
+      console.log(
+        `update TempTx from ${endpoint_url} / ${timeStamp} to state: ${state}, log: ${log}`,
+      );
     }
     tempTransaction.txHash = txHash;
     tempTransaction.active = state;
@@ -639,7 +682,7 @@ export class TransactionService {
 
   async getPendingTransactions() {
     const threeDaysAgo = new Date(
-      new Date().getTime() - 3 * 60 * 60 * 24 * 1000,
+      new Date().getTime() - 3 * 24 * 60 * 60 * 1000,
     ); // TODO : 일단 3일 전까지 조회하도록 설정했으나, 나중에 기준 설정 필요
     return await this.transactionsRepository.find({
       where: {
@@ -647,6 +690,10 @@ export class TransactionService {
         active: In(['pending', 'staging']),
       },
       select: ['id', 'endpoint_url', 'txHash', 'timeStamp'], // 필요한 필드만 선택
+      order: {
+        id: 'DESC',
+      }, //id는 인덱스라 문제 없음
+      take: 100, //최대 100개 = 오래된 id 순으로 10분 분량을 처리하는 것으로 제한하여 리소스 사용량 제한
     });
   }
 
@@ -680,32 +727,8 @@ export class TransactionService {
       console.warn(`No transaction found with ID ${id}`);
     }
   }
-}
 
-//TODO : graphql 함수 구현 후 개발
-/*async function checkAllAccountBalance(group: string) {
-  for (let i = 0; i < this.accounts.length; i++) {
-    await checkBalance(i, group);
-  }
 }
-
-async function checkBalance(accountNumber: number, group: string) {
-  const account = this.accounts[accountNumber];
-  const endpoint =
-    group === 'odin'
-      ? 'https://odin-rpc-1.nine-chronicles.com/graphql'
-      : 'https://heimdall-rpc-2.nine-chronicles.com/graphql';
-  //TODO : 실패 시 엔드포인트 변경하며 재시도하는 함수
-  const balance = await this.instanceForCheck.post(endpoint, {
-    variables: { address: account.address },
-    query: `
-      query getBalance($address: Address!) {
-        balance(address: $address)
-      }
-    `,
-  });
-  return balance;
-}*/
 
 interface FungibleAssetValue {
   quantity: number;
