@@ -10,9 +10,9 @@ import { toTimezoneDateString, toTimezoneHourNumber } from "@/src/helper";
 
 //TODO : 통계 수집 후 기준 명확화
 const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.34; // 데이터가 34% 이상 없으면 회색
-const DAY_UPTIME_PENDING_THRESHOLD = 0.1; // 지연이 10% 이상 있으면 노란색
-const DAY_UPTIME_ACTIVE_THRESHOLD = 0.966; // 정상이 96.6% 이상 있으면 초록색
-const DAY_UPTIME_WARNING_THRESHOLD = 0.8; // 정상이 85% 이상 있으면 주황색
+const DAY_UPTIME_PENDING_COUNT_THRESHOLD = 5; // 지연이 5개 이상 있으면 빨간색 (일반적으로 3분 이상 지났으면 failed 처리하므로 3개 이하)
+const DAY_UPTIME_ACTIVE_THRESHOLD = 1; // 정상이 100%인 경우에만 초록색
+const DAY_UPTIME_WARNING_THRESHOLD = 0.8; // 정상이 80% 이상 있으면 노란색
 
 export default function DayUptimeGraph({
   onBarClick,
@@ -64,45 +64,42 @@ export default function DayUptimeGraph({
   }, []);
 
   const getColorForDay = (dayUptimeData: DayUptimeEntry) => {
+    const meaningfulDayUpdimeDataCount =
+      dayUptimeData.total - dayUptimeData.temp - dayUptimeData.pending; //전송 실패 및 지연은 데이터로 취급되지 않는다.
     if (!dayUptimeData || dayUptimeData.total === 0)
       return "rgb(229, 231, 235)"; // 회색 (정보 없음)
     else if (
-      dayUptimeData.total <
+      meaningfulDayUpdimeDataCount <
       maxDataNumber * DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD
     )
       return "rgb(169, 172, 178)"; // 진한 회색 (정보 적음)
     else if (
-      dayUptimeData.false + dayUptimeData.timeout >
-      dayUptimeData.total * DAY_UPTIME_ACTIVE_THRESHOLD
+      dayUptimeData.pending >=
+      nodeNumber * DAY_UPTIME_PENDING_COUNT_THRESHOLD //노드별로 THRESHOLD개 만큼까지만 허용
     )
-      return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
-    else if (
-      dayUptimeData.pending >
-      dayUptimeData.total * DAY_UPTIME_PENDING_THRESHOLD
-    )
-      return "rgb(169, 172, 178)"; // 진한 회색 (지연 오류)
+      return "rgb(239, 68, 68)"; // 빨간색 (pending 처리되지 않는 심각한 문제)
     else if (
       dayUptimeData.true >=
-      dayUptimeData.total * DAY_UPTIME_ACTIVE_THRESHOLD
+      meaningfulDayUpdimeDataCount * DAY_UPTIME_ACTIVE_THRESHOLD
     )
       return "rgb(74, 222, 128)"; // 초록색 (정상)
     else if (
       dayUptimeData.true >=
-      dayUptimeData.total * DAY_UPTIME_WARNING_THRESHOLD
+      meaningfulDayUpdimeDataCount * DAY_UPTIME_WARNING_THRESHOLD
     )
       return "rgb(250, 204, 21)"; // 노란색 (경고)
-    else return "rgb(239, 68, 68)"; // 검은색 (오류). 여기까지 오면 문제가 발생한 것
+    else return "rgb(239, 68, 68)"; // 빨간색 (오류 개수 허용치 이상) or (true가 경고 범위 아래)
   };
 
   const hoverContentForDay = (label: string, uptimeData: DayUptimeEntry) => {
     return {
-      top: `Hour: ${label}, Uptime: ${
+      uptime: `Hour: ${label}, Uptime: ${
         uptimeData.total - uptimeData.temp >
         DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD * maxDataNumber
           ? `${Math.round((uptimeData.true / uptimeData.total) * 100)}%`
           : "not enough data"
       }`,
-      bottom: `Total: ${uptimeData.total}, Active: ${uptimeData.true}, Error: ${uptimeData.false}, Timeout: ${uptimeData.timeout}, Pending: ${uptimeData.pending}, Dashboard Failure: ${uptimeData.temp}, Null: ${uptimeData.null}`,
+      count: `Total: ${uptimeData.total}, Active: ${uptimeData.true}, Error: ${uptimeData.false}, Timeout: ${uptimeData.timeout}, Pending: ${uptimeData.pending}, Dashboard Failure: ${uptimeData.temp}, Null: ${uptimeData.null}`,
     }; //TODO 데이터 타입에 따라 수정
   };
 
@@ -139,8 +136,8 @@ export default function DayUptimeGraph({
     x: number;
     y: number;
     content: {
-      top: string;
-      bottom: string;
+      uptime: string;
+      count: string;
     };
   } | null>(null);
 
@@ -148,7 +145,7 @@ export default function DayUptimeGraph({
 
   return (
     <div>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 transform-none">
         <button onClick={() => handleDateChange(date, "prev")}>
           <ArrowLeftCircleIcon className="w-5 h-5" />
         </button>
@@ -205,15 +202,15 @@ export default function DayUptimeGraph({
       </div>
       {hoveredItem && (
         <div
-          className="absolute bg-white p-2 rounded shadow-lg text-sm border border-gray-300"
+          className="absolute bg-white p-2 rounded shadow-lg text-sm border border-gray-300 z-50"
           style={{
             left: `${hoveredItem.x}px`,
             top: `${hoveredItem.y}px`,
             transform: "translateX(-50%)",
           }}
         >
-          <div className="text-bold">{hoveredItem.content.top}</div>
-          <div className="text-gray-500">{hoveredItem.content.bottom}</div>
+          <div className="text-bold">{hoveredItem.content.uptime}</div>
+          <div className="text-gray-500">{hoveredItem.content.count}</div>
         </div>
       )}
     </div>

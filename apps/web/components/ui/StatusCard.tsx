@@ -38,7 +38,9 @@ export default function StatusCard({
         (item) =>
           item.endpoint_url === nodeName &&
           new Date(item.timeStamp).getTime() > recentTime &&
-          (item.active === "true" || item.active === "false")
+          (item.active === "true" ||
+            item.active === "false" ||
+            item.active === "timeout")
       );
       return nodeStatus;
     });
@@ -53,7 +55,10 @@ export default function StatusCard({
       } else if (!nodeStatus) {
         isHealthyState = "unknown";
         newUnknownNodes.push(networkNodeNames[index]);
-      } else if (nodeStatus.active === "false") {
+      } else if (
+        nodeStatus.active === "false" ||
+        nodeStatus.active === "timeout"
+      ) {
         isHealthyState = "false";
         newFalseNodes.push(networkNodeNames[index]);
       }

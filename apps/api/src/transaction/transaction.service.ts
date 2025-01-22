@@ -28,7 +28,7 @@ export class TransactionService {
   private instanceForCheck;
   private accounts: Account[] = []; //cached accounts
   private sendCount = 0;
-  private readonly balanceUpdateThreshold = 10;
+  private readonly balanceUpdateThreshold = 7;
   private isBalanceChecked = false;
 
   constructor(
@@ -220,25 +220,34 @@ export class TransactionService {
   }
 
   public async fetchTransactions(start: string, end: string, group?: string) {
+    // 1분 전까지만 fetch (pending, temp 노출되지 않도록)
+    const oneMinuteAgo = new Date(Date.now() - 60000);
+    const adjustedEnd =
+      new Date(end) > oneMinuteAgo ? oneMinuteAgo : new Date(end);
+
+    // adjustedEnd가 start보다 작아질 경우 start로 조정
+    const startDate = new Date(start);
+    if (adjustedEnd < startDate) {
+      return [];
+    }
+
     if (group || group === 'all') {
-      console.log('service:fetchTransactions', start, end, group);
+      console.log('service:fetchTransactions', start, adjustedEnd, group);
       const transactionStatus = await this.transactionsRepository.find({
         where: {
-          timeStamp: Between(new Date(start), new Date(end)),
+          timeStamp: Between(startDate, adjustedEnd),
         },
       });
-      //console.log(transactionStatus);
       return transactionStatus;
     }
 
-    // group이 있을 경우 해당 group 조회
+    // group이 있을 경우 해당 group 조회 (현재는 사용되고 있지 않음)
     const transactionStatus = await this.transactionsRepository.find({
       where: {
-        timeStamp: Between(new Date(start), new Date(end)),
+        timeStamp: Between(startDate, adjustedEnd),
         group_name: group,
       },
     });
-    //console.log(transactionStatus);
     return transactionStatus;
   }
 
@@ -364,7 +373,7 @@ export class TransactionService {
             '',
             timeStamp,
             'false',
-            'failed send request : socket hang up, ' + error.message || error,
+            'failed send request - socket hang up, ' + error.message || error,
           );
         } else if (this.isErrorLogInclude('timeout', error)) {
           await this.updateTempTx(
@@ -372,7 +381,7 @@ export class TransactionService {
             '',
             timeStamp,
             'false',
-            'failed send request : exceeded 20s, ' + error.message || error,
+            'failed send request - exceeded 20s, ' + error.message || error,
           );
         } else {
           await this.updateTempTx(
@@ -380,7 +389,7 @@ export class TransactionService {
             '',
             timeStamp,
             'temp',
-            'failed send request : unknown error, ' + error.message || error,
+            'failed send request - unknown error, ' + error.message || error,
           );
         }
       }

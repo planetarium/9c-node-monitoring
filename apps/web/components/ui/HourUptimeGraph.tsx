@@ -36,7 +36,7 @@ const getLabelForHour = (index: number) => {
 };
 
 const hoverContentForHour = (label: string, item: TransactionData) => {
-  const message =
+  const statusMessage =
     item.active === "true"
       ? "active"
       : item.active === "temp"
@@ -48,7 +48,12 @@ const hoverContentForHour = (label: string, item: TransactionData) => {
       : item.active === "timeout"
       ? "timeout"
       : "failed";
-  return `Minute: ${label}, Status: ${message}`;
+  const failLog = item.log ? item.log.split(",")[0] : null;
+  return {
+    label, // Minute 정보
+    statusMessage: statusMessage, // 상태 메시지
+    failLog: failLog, // 로그 정보
+  };
 };
 
 export default function HourUptimeGraph({
@@ -63,7 +68,11 @@ export default function HourUptimeGraph({
   const [hoveredItem, setHoveredItem] = useState<{
     x: number;
     y: number;
-    content: string;
+    content: {
+      label: string;
+      statusMessage: string;
+      failLog: string | null;
+    };
   } | null>(null);
   const [barHeight, setBarHeight] = useState("35px");
 
@@ -151,14 +160,17 @@ export default function HourUptimeGraph({
       </div>
       {hoveredItem && (
         <div
-          className="absolute bg-white p-2 rounded shadow-lg text-sm border border-gray-300"
+          className="absolute bg-white p-2 rounded shadow-lg text-sm border border-gray-300 z-50"
           style={{
             left: `${hoveredItem.x}px`,
             top: `${hoveredItem.y}px`,
             transform: "translateX(-50%)",
           }}
         >
-          {hoveredItem.content}
+          <div>{`Minute: ${hoveredItem.content.label}, Status: ${hoveredItem.content.statusMessage}`}</div>
+          {hoveredItem.content.failLog && (
+            <div className="text-gray-500">{`log : ${hoveredItem.content.failLog}`}</div>
+          )}
         </div>
       )}
     </div>
