@@ -45,6 +45,33 @@ export class AccountService {
       : this.heimdallBalances[index];
   }
 
+  getLowestBalanceAccount(group: 'odin' | 'heimdall'): number | null {
+    try {
+      const balances =
+        group === 'odin' ? this.odinBalances : this.heimdallBalances;
+
+      if (balances.length === 0) {
+        throw new Error('Balance array is empty');
+      }
+
+      const minIndex = balances.reduce(
+        (minIndex, balance, index) =>
+          balance < balances[minIndex] ? index : minIndex,
+        0,
+      );
+      console.log(
+        'getLowestBalanceAccount: group',
+        group,
+        'selected minIndex',
+        minIndex,
+      );
+      return minIndex;
+    } catch (error) {
+      console.error('Error in getLowestBalanceAccount:', error);
+      return null; // 오류 발생 시 기본값 반환
+    }
+  }
+
   updateBalance(
     group: 'odin' | 'heimdall',
     index: number,
@@ -70,9 +97,9 @@ export class AccountService {
         await this.getAllAccountBalances();
       this.odinBalances = odinBalances;
       this.heimdallBalances = heimdallBalances;
-      //   console.log('updated account balances');
-      //   console.log(odinBalances);
-      //   console.log(heimdallBalances);
+      console.log('updated account balances');
+      console.log(odinBalances);
+      console.log(heimdallBalances);
     } catch (error) {
       console.error('Failed to update account balances:', error);
     }
@@ -173,3 +200,4 @@ interface Account {
   privateKey: string;
   address: string;
 }
+

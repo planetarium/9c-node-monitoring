@@ -28,7 +28,7 @@ export class TransactionService {
   private instanceForCheck;
   private accounts: Account[] = []; //cached accounts
   private sendCount = 0;
-  private readonly balanceUpdateThreshold = 5;
+  private readonly balanceUpdateThreshold = 10;
   private isBalanceChecked = false;
 
   constructor(
@@ -64,13 +64,13 @@ export class TransactionService {
 
     this.sendCount++;
 
-    if (this.sendCount % this.balanceUpdateThreshold === 1) {
+    if (this.sendCount === 1) {
       console.log('send count : ', this.sendCount, 'update balance.');
       try {
         await this.accountService.updateAllAccountBalances();
-        this.isBalanceChecked = true; // 한번이라도 체크를 한 경우에만 계좌 배분 시스템 활용
+        this.isBalanceChecked = true; // 한번이라도 체크를 한 경우에만 계좌 배분 시스템 활용 가능
       } catch (error) {
-        console.error('update balance failed', error);
+        console.error('Error : updating initial balance failed', error);
       }
     }
 
@@ -102,7 +102,6 @@ export class TransactionService {
   }
 
   public async updatePendingTransactions() {
-    console.log('updatePendingTransactions');
     // fetch 구현 후 개발
     const pendingTransactions: Array<{
       id: number;
@@ -111,7 +110,10 @@ export class TransactionService {
       timeStamp: Date;
     }> = await this.getPendingTransactions(); // 명시적 타입
 
-    console.log('pendingTransactions', pendingTransactions);
+    console.log(
+      'updatependingTransactions. count: ',
+      pendingTransactions.length,
+    );
 
     // endpoint_url 기준으로 그룹화
     const groupedTransactions = pendingTransactions.reduce<{
@@ -134,7 +136,7 @@ export class TransactionService {
     for (const [endpoint_url, transactions] of Object.entries(
       groupedTransactions,
     )) {
-      console.log(endpoint_url, '상태 조회 시작');
+      console.log('start checking status', endpoint_url);
       const txIds = transactions.map((tx) => tx.txHash); // 해당 endpoint_url에 해당하는 txHash 배열
 
       if (endpoint_url.includes('heimdall'))
@@ -142,7 +144,6 @@ export class TransactionService {
       else checkEndpointUrl = 'https://odin-rpc-1.nine-chronicles.com/graphql'; //TODO: 원래 odin-rpc-2였는데 이거 작동 안해서 1로 바꿈. 왜 이렇게 정하는 거지? 얘네가 문제 생기면 어떡하려고?
 
       const statuses = await this.getTxStatus(checkEndpointUrl, txIds);
-      console.log(statuses, '상태 조회 완료');
       // 5. 상태별로 처리
       for (const [index, status] of statuses.entries()) {
         const row = transactions[index]; // 각 상태에 대응하는 트랜잭션 정보
@@ -150,12 +151,10 @@ export class TransactionService {
           id: row.id,
           status,
         };
-        console.log(result, '상태 조회 결과');
+        console.log(result);
 
         const elapsedTime =
-          (new Date().getTime() - new Date(row.timeStamp).getTime()) / 1000; //나중에는 staging 안에 넣기
-        console.log('elapsedTime', elapsedTime);
-
+          (new Date().getTime() - new Date(row.timeStamp).getTime()) / 1000;
         if (result.status.txStatus === 'SUCCESS') {
           await this.updateCompletedTx(result.id);
           console.log('updateCompletedTx', result.id);
@@ -206,6 +205,17 @@ export class TransactionService {
       }
     }
     console.log('updatePendingTransactions end');
+
+    if (this.sendCount % this.balanceUpdateThreshold === 0) {
+      console.log('send count : ', this.sendCount, 'update balance');
+      try {
+        await this.accountService.updateAllAccountBalances();
+        this.isBalanceChecked = true; // 한번이라도 체크를 한 경우에만 계좌 배분 시스템 활용
+      } catch (error) {
+        console.error('Error : updating balance failed', error);
+      }
+    }
+
     return;
   }
 
@@ -301,9 +311,12 @@ export class TransactionService {
       // }
       const accountNumber = i % usingAccountNumber;
       const senderIndex = accountNumber;
-      const recieverIndex = (accountNumber + 1) % usingAccountNumber;
+      const recieverIndex = this.isBalanceChecked
+        ? (this.accountService.getLowestBalanceAccount(groupName) ??
+          (accountNumber + 1) % usingAccountNumber)
+        : (accountNumber + 1) % usingAccountNumber;
       const sender = this.accounts[senderIndex].address;
-      const recipient = this.accounts[recieverIndex].address; // 다음사람한테 주기.
+      const recipient = this.accounts[recieverIndex].address;
       console.log(
         'accountNumber',
         accountNumber,
@@ -321,7 +334,7 @@ export class TransactionService {
         const txHash = await this.sendTx(
           rpcEndpoints[i],
           action,
-          this.accounts[i], //TODO: 이 계좌를 기반으로 전송된다. senderIndex로 수정해야 한다.
+          this.accounts[i], //TODO: 만약 nonce를 직접 처리하고, 전송 계좌를 바꿔가며 더 높은 안정성 추구한다면 senderIndex로 수정해야 한다.
         );
         if (!txHash) {
           console.error(
@@ -611,7 +624,6 @@ export class TransactionService {
   };
 
   async getTxStatus(endpoint: string, txIds: string[]) {
-    console.log(endpoint, txIds, 'start');
     try {
       const { data } = await this.instanceForCheck.post(endpoint, {
         variables: { txIds }, // 배열로 전달
@@ -626,7 +638,7 @@ export class TransactionService {
             }
         `,
       });
-      console.log(endpoint, txIds, 'finish');
+      console.log('getTxStatus', endpoint, txIds);
 
       return data['data']['transaction']['transactionResults']; // 여러 결과가 배열로 반환됨
     } catch (e) {
