@@ -27,7 +27,7 @@ export default function DayUptimeSection({
   const isSection = !isBox;
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const { transactionCache } = useTransactionCache();
-  const { isLoading } = useLoadingContext();
+  const { loadingCount } = useLoadingContext();
 
   const handleGraphClick = (hour: number | null) => {
     setSelectedHour((prev) => (prev === hour ? null : hour)); // 같은 시간 클릭 시 닫기
@@ -46,7 +46,8 @@ export default function DayUptimeSection({
 
   /* 데이터 관리 파트 */
   const dateString = date.toISOString().split("T")[0];
-  const selectedDateData = isLoading ? [] : transactionCache[dateString] ?? [];
+  const selectedDateData =
+    loadingCount <= 0 ? [] : transactionCache[dateString] ?? [];
   const filteredData = node
     ? selectedDateData?.filter((item) => item.endpoint_url === node) ?? []
     : selectedDateData?.filter(

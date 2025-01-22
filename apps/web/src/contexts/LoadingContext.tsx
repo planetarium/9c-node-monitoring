@@ -1,13 +1,13 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 
 type LoadingContextType = {
-  isLoading: boolean;
-  setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  loadingCount: number;
+  incrementCount: () => void;
 };
 
 const LoadingContext = createContext<LoadingContextType>({
-  isLoading: true,
-  setIsLoading: () => {},
+  loadingCount: 0,
+  incrementCount: () => {}, // 로딩 증가 함수
 });
 
 export const LoadingContextProvider = ({
@@ -15,10 +15,14 @@ export const LoadingContextProvider = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const [isLoading, setIsLoading] = useState(true);
+  const [loadingCount, setLoadingCount] = useState(0);
+
+  const incrementCount = useCallback(() => {
+    setLoadingCount((prev) => prev + 1);
+  }, []);
 
   return (
-    <LoadingContext.Provider value={{ isLoading, setIsLoading }}>
+    <LoadingContext.Provider value={{ loadingCount, incrementCount }}>
       {children}
     </LoadingContext.Provider>
   );

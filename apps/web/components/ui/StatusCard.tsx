@@ -16,7 +16,7 @@ export default function StatusCard({
 }) {
   const { transactionCache } = useTransactionCache();
   const { nodeNames } = useNodeContext();
-  const { isLoading } = useLoadingContext();
+  const { loadingCount } = useLoadingContext();
   const [isHealthy, setIsHealthy] = useState("true");
   const [falseNodes, setFalseNodes] = useState<string[]>([]);
   const [unknownNodes, setUnknownNodes] = useState<string[]>([]);
@@ -26,7 +26,8 @@ export default function StatusCard({
     const today = new Date();
     const todayDate = toTimezoneDateString(today, 9);
     // 오늘 날짜의 노드 상태 가져오기
-    const todayStatus = isLoading ? [] : transactionCache[todayDate] || [];
+    const todayStatus =
+      loadingCount <= 0 ? [] : transactionCache[todayDate] || [];
     const networkNodeNames = nodeNames[network] || [];
 
     const recentLimit = 5;
@@ -50,7 +51,7 @@ export default function StatusCard({
     let isHealthyState = "true";
 
     for (const [index, nodeStatus] of lastestNodeStatus.entries()) {
-      if (isLoading) {
+      if (loadingCount <= 0) {
         isHealthyState = "true";
       } else if (!nodeStatus) {
         isHealthyState = "unknown";
@@ -82,7 +83,7 @@ export default function StatusCard({
     network,
     isHealthy,
     setTabBackgroundColor,
-    isLoading,
+    loadingCount,
   ]);
 
   const message =

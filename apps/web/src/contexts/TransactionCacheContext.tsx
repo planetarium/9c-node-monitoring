@@ -5,16 +5,13 @@ import { toTimezoneDateString } from "@/src/helper";
 
 type TransactionCacheContextType = {
   transactionCache: TransactionCache;
-  fetchTransactionDataWithCache: (
-    group: string,
-    date: Date
-  ) => Promise<Record<string, TransactionData[]> | null>;
+  fetchTransactionDataWithCache: (group: string, date: Date) => Promise<void>;
 };
 
 // Context 생성
 const TransactionCacheContext = createContext<TransactionCacheContextType>({
   transactionCache: {},
-  fetchTransactionDataWithCache: async () => null,
+  fetchTransactionDataWithCache: async () => {},
 });
 
 type TransactionCacheProviderProps = {
@@ -52,9 +49,45 @@ export const TransactionCacheProvider = ({
   //TODO 추가로 odin, heimdal 둘 다 캐시하고 있으니 성능상 필요하다면 한 쪽만 캐시하도록 수정
   children,
 }: TransactionCacheProviderProps) => {
-  const { setIsLoading } = useLoadingContext();
+  const { incrementCount } = useLoadingContext();
 
   const transactionCacheRef = useRef<TransactionCache>({}); // 캐시 ref
+
+  // 비동기 요청을 처리하는 함수
+  const fetchAndCacheTransactions = useCallback(
+    async (group: string, dates: string[]) => {
+      if (dates.length === 0) return;
+
+      const startDateTime = formatKoreaDateToUTCDateTime(dates[0], "start");
+      const endDateTime = formatKoreaDateToUTCDateTime(
+        dates[dates.length - 1],
+        "end"
+      );
+
+      const response = await fetch(
+        `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime}&end=${endDateTime}`
+      );
+
+      if (!response.ok) {
+        console.error(`Error: ${response.status} - ${response.statusText}`);
+        return null;
+      }
+
+      const fetchedData = await response.json();
+
+      const groupedFetchedData = arrayToDateKeyMap(fetchedData);
+
+      dates.forEach((date) => {
+        if (!transactionCacheRef.current[date]) {
+          transactionCacheRef.current[date] = [];
+        }
+        transactionCacheRef.current[date] = groupedFetchedData[date] || [];
+      });
+
+      incrementCount();
+    },
+    [incrementCount]
+  );
 
   const fetchTransactionDataWithCache = useCallback(
     //todo: usecallback 써야하나?
@@ -77,62 +110,30 @@ export const TransactionCacheProvider = ({
         .filter((d) => d <= today)
         .map((d) => toTimezoneDateString(d, 9));
 
-      //console.log("dateKeysUntilToday", dateKeysUntilToday);
-
-      const datesToFetch = dateKeysUntilToday.filter(
+      // 즉시 가져올 데이터
+      const immediateDates = dateKeysUntilToday.filter(
         (dateKey) =>
-          !transactionCacheRef.current[dateKey] ||
-          (dateKey === toTimezoneDateString(today, 9) &&
-            toTimezoneDateString(currentDate, 9) ===
-              toTimezoneDateString(today, 9)) //오늘 데이터인 경우 fetch 포함
+          dateKey === toTimezoneDateString(currentDate, 9) && // current만 가져오되,
+          (dateKey === toTimezoneDateString(today, 9) || // current가 오늘이라면 무조건 가져오고
+            !transactionCacheRef.current[dateKey]) // 그렇지 않으면 캐시 여부 확인
       );
 
-      if (datesToFetch.length === 0) {
-        return dateKeysUntilToday.reduce<Record<string, TransactionData[]>>(
-          (acc, key) => {
-            acc[key] = transactionCacheRef.current[key];
-            return acc;
-          },
-          {}
-        );
-      }
-
-      // 해당 날짜의 범위를 UTC로 변환해 API 요청
-      const startDateTime = formatKoreaDateToUTCDateTime(
-        datesToFetch[0],
-        "start"
-      ); // 00:00:00
-      const endDateTime = formatKoreaDateToUTCDateTime(
-        datesToFetch[datesToFetch.length - 1],
-        "end"
-      ); // 23:59:59
-
-      const response = await fetch(
-        `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime}&end=${endDateTime}`
+      // 천천히 가져올 데이터
+      const laterDates = dateKeysUntilToday.filter(
+        (dateKey) =>
+          dateKey !== toTimezoneDateString(currentDate, 9) && // current가 아닌 날짜
+          !transactionCacheRef.current[dateKey] // 캐시에 없는 경우만
       );
 
-      if (!response.ok) {
-        console.error(`Error: ${response.status} - ${response.statusText}`);
-        return null;
+      if (immediateDates.length > 0) {
+        await fetchAndCacheTransactions(group, immediateDates);
       }
 
-      const fetchedData = await response.json();
-
-      // 배열 데이터를 날짜별로 그룹화
-      const groupedFetchedData = arrayToDateKeyMap(fetchedData);
-
-      // 캐시에 저장
-      datesToFetch.forEach((date) => {
-        if (!transactionCacheRef.current[date]) {
-          transactionCacheRef.current[date] = [];
-        }
-        transactionCacheRef.current[date] = groupedFetchedData[date] || [];
-      });
-
-      setIsLoading(false);
-      return fetchedData;
+      if (laterDates.length > 0) {
+        fetchAndCacheTransactions(group, laterDates); // 비동기 실행
+      }
     },
-    [setIsLoading]
+    [fetchAndCacheTransactions]
   );
 
   return (
