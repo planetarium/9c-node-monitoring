@@ -231,7 +231,7 @@ export class TransactionService {
       return [];
     }
 
-    if (group || group === 'all') {
+    if (!group || group === 'all') {
       console.log('service:fetchTransactions', start, adjustedEnd, group);
       const transactionStatus = await this.transactionsRepository.find({
         where: {
@@ -351,10 +351,17 @@ export class TransactionService {
           );
           continue;
         }
-        console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
         console.log('Sender', sender, 'Recipient', recipient);
-        this.accountService.updateBalance(groupName, senderIndex, -0.01);
-        this.accountService.updateBalance(groupName, recieverIndex, 0.01);
+        this.accountService.updateBalance(
+          groupName,
+          senderIndex,
+          -Number(amount) / 100,
+        );
+        this.accountService.updateBalance(
+          groupName,
+          recieverIndex,
+          Number(amount) / 100,
+        );
         await this.updateTempTx(
           rpcEndpoints[i],
           txHash,

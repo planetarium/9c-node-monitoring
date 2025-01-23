@@ -93,62 +93,64 @@ export class AccountService {
       //   console.log('before updating account balances');
       //   console.log(this.odinBalances);
       //   console.log(this.heimdallBalances);
-      const { odinBalances, heimdallBalances } =
+      const { newOdinBalances, newHeimdallBalances } =
         await this.getAllAccountBalances();
-      this.odinBalances = odinBalances;
-      this.heimdallBalances = heimdallBalances;
+      this.odinBalances = newOdinBalances;
+      this.heimdallBalances = newHeimdallBalances;
       console.log('updated account balances');
-      console.log(odinBalances);
-      console.log(heimdallBalances);
+      console.log(newOdinBalances);
+      console.log(newHeimdallBalances);
     } catch (error) {
       console.error('Failed to update account balances:', error);
     }
   }
 
   public async getAllAccountBalances(): Promise<{
-    odinBalances: number[];
-    heimdallBalances: number[];
+    newOdinBalances: number[];
+    newHeimdallBalances: number[];
   }> {
-    const odinBalances: number[] = [];
-    const heimdallBalances: number[] = [];
+    const accountBalancePromises = this.accounts.map(async (_, i) => {
+      let odinBalance = 0;
+      let heimdallBalance = 0;
 
-    for (let i = 0; i < this.accounts.length; i++) {
       try {
         const odinResponse = await this.getAccountBalance(i, 'odin');
-
-        // balance.quantity 추출
-        const odinBalanceQuantity = parseFloat(
+        odinBalance = parseFloat(
           odinResponse?.data?.stateQuery?.balance?.quantity || '0',
         );
-        odinBalances.push(odinBalanceQuantity);
       } catch (error) {
         console.error(
           `Failed to fetch balance for group odin account ${i}:`,
           error,
         );
-        odinBalances.push(-1); // 에러 시 "-1"로 처리
+        odinBalance = this.odinBalances[i] ?? 0.14; // 에러 시 기존 데이터나 적절한 기본값 (약 총 금액의 11%) 활용
       }
 
       try {
         const heimdallResponse = await this.getAccountBalance(i, 'heimdall');
-
-        // balance.quantity 추출
-        const heimdallBalanceQuantity = parseFloat(
+        heimdallBalance = parseFloat(
           heimdallResponse?.data?.stateQuery?.balance?.quantity || '0',
         );
-        heimdallBalances.push(heimdallBalanceQuantity);
       } catch (error) {
         console.error(
           `Failed to fetch balance for group heimdal account ${i}:`,
           error,
         );
-        heimdallBalances.push(-1); // 에러 시 "-1"로 처리
+        heimdallBalance = this.heimdallBalances[i] ?? 0.23; // 에러 시 기존 데이터나 적절한 기본값 (약 총 금액의 11%) 활용
       }
-    }
+
+      return { odinBalance, heimdallBalance };
+    });
+
+    const results = await Promise.all(accountBalancePromises);
+
+    // 결과를 병합
+    const newOdinBalances = results.map((result) => result.odinBalance);
+    const newHeimdallBalances = results.map((result) => result.heimdallBalance);
 
     return {
-      odinBalances,
-      heimdallBalances,
+      newOdinBalances,
+      newHeimdallBalances,
     };
   }
 
