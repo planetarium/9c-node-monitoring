@@ -6,6 +6,7 @@ import {
 } from "@heroicons/react/24/solid";
 import { useEffect, useState } from "react";
 import { useNodeContext } from "@/src/contexts/NodeContext";
+import { useTimeZoneContext } from "@/src/contexts/TimezoneContext";
 import { toTimezoneDateString, toTimezoneHourNumber } from "@/src/helper";
 
 //TODO : 통계 수집 후 기준 명확화
@@ -32,9 +33,10 @@ export default function DayUptimeGraph({
 }) {
   //TODO : selectedHour 바뀔 때마다 렌더링 되는데, 성능 최적화 필요한지 고민
   const { nodeNames } = useNodeContext();
+  const { userTimeZone } = useTimeZoneContext();
   const nodeNumber = nodeNames?.[network]?.length || 1;
   const maxDataNumber = 60 * nodeNumber;
-  const currentTimezoneHour = toTimezoneHourNumber(date, 9);
+  const currentTimezoneHour = toTimezoneHourNumber(date, userTimeZone);
   const [barHeight, setBarHeight] = useState("40px");
   const [outlineWidth, setOutlineWidth] = useState("3px");
 
@@ -150,7 +152,7 @@ export default function DayUptimeGraph({
           <ArrowLeftCircleIcon className="w-5 h-5" />
         </button>
         <h2 className="text-xl font-semibold">
-          {network} {toTimezoneDateString(date, 9)} Uptime
+          {network} {toTimezoneDateString(date, userTimeZone)} Uptime
         </h2>
         <button onClick={() => handleDateChange(date, "next")}>
           <ArrowRightCircleIcon className="w-5 h-5" />

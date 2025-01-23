@@ -1,7 +1,9 @@
 import React, { createContext, useCallback, useContext, useRef } from "react";
 import { TransactionData, TransactionCache } from "@/src/types";
 import { useLoadingContext } from "@/src/contexts/LoadingContext";
+import { useTimeZoneContext } from "@/src/contexts/TimezoneContext";
 import { toTimezoneDateString } from "@/src/helper";
+import { fromZonedTime } from "date-fns-tz";
 
 type TransactionCacheContextType = {
   transactionCache: TransactionCache;
@@ -18,25 +20,28 @@ type TransactionCacheProviderProps = {
   children: React.ReactNode;
 };
 
-// 한국 시간 기준의 00:00:00 또는 23:59:59를 UTC로 변환
-const formatKoreaDateToUTCDateTime = (date: string, start: string): string => {
-  //date는 "YYYY-MM-DD" 형태
-  const adjustedDate = new Date(`${date}T00:00:00+09:00`); // 한국 시간 기준 00:00:00로 시간 생성
+// 현지 시간 기준의 00:00:00 또는 23:59:59를 UTC로 변환
+export const formatLocalDateToUTCDateTime = (
+  date: string,
+  range: "start" | "end"
+): string => {
+  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const time = range === "start" ? "T00:00:00" : "T23:59:59.999";
+  const localDateTime = `${date}${time}`;
+  const utcDate = fromZonedTime(localDateTime, timeZone);
 
-  if (start === "start") {
-    adjustedDate.setHours(0, 0, 0, 0);
-  } else {
-    adjustedDate.setHours(23, 59, 59, 999);
-  }
-
-  return adjustedDate.toISOString(); // 최종 UTC 시간 문자열 반환
+  return utcDate.toISOString();
 };
 
 const arrayToDateKeyMap = (
-  data: TransactionData[]
+  data: TransactionData[],
+  userTimeZone: string
 ): Record<string, TransactionData[]> => {
   return data.reduce((acc, item) => {
-    const dateKey = toTimezoneDateString(new Date(item.timeStamp), 9); // `timeStamp`를 한국 시간 기준 `YYYY-MM-DD`로 변환
+    const dateKey = toTimezoneDateString(
+      new Date(item.timeStamp),
+      userTimeZone
+    ); // `timeStamp`를 현지 시간 기준 `YYYY-MM-DD`로 변환
     if (!acc[dateKey]) {
       acc[dateKey] = []; // 해당 날짜가 없으면 배열 초기화
     }
@@ -50,6 +55,7 @@ export const TransactionCacheProvider = ({
   children,
 }: TransactionCacheProviderProps) => {
   const { incrementCount } = useLoadingContext();
+  const { userTimeZone } = useTimeZoneContext();
 
   const transactionCacheRef = useRef<TransactionCache>({}); // 캐시 ref
 
@@ -62,8 +68,8 @@ export const TransactionCacheProvider = ({
 
       if (dates.length === 1) {
         // 단일 날짜 요청
-        const startDateTime = formatKoreaDateToUTCDateTime(dates[0], "start");
-        const endDateTime = formatKoreaDateToUTCDateTime(dates[0], "end");
+        const startDateTime = formatLocalDateToUTCDateTime(dates[0], "start");
+        const endDateTime = formatLocalDateToUTCDateTime(dates[0], "end");
 
         const response = await fetch(
           `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime}&end=${endDateTime}`
@@ -75,7 +81,7 @@ export const TransactionCacheProvider = ({
         }
 
         const fetchedData = await response.json();
-        const groupedFetchedData = arrayToDateKeyMap(fetchedData);
+        const groupedFetchedData = arrayToDateKeyMap(fetchedData, userTimeZone);
 
         // 캐시에 저장
         if (!transactionCacheRef.current[group]) {
@@ -86,11 +92,11 @@ export const TransactionCacheProvider = ({
           groupedFetchedData[dates[0]] || [];
       } else if (dates.length === 2) {
         // 두 날짜 요청
-        const startDateTime1 = formatKoreaDateToUTCDateTime(dates[0], "start");
-        const endDateTime1 = formatKoreaDateToUTCDateTime(dates[0], "end");
+        const startDateTime1 = formatLocalDateToUTCDateTime(dates[0], "start");
+        const endDateTime1 = formatLocalDateToUTCDateTime(dates[0], "end");
 
-        const startDateTime2 = formatKoreaDateToUTCDateTime(dates[1], "start");
-        const endDateTime2 = formatKoreaDateToUTCDateTime(dates[1], "end");
+        const startDateTime2 = formatLocalDateToUTCDateTime(dates[1], "start");
+        const endDateTime2 = formatLocalDateToUTCDateTime(dates[1], "end");
 
         const response = await fetch(
           `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime1}&end=${endDateTime1}&start2=${startDateTime2}&end2=${endDateTime2}`
@@ -102,7 +108,7 @@ export const TransactionCacheProvider = ({
         }
 
         const fetchedData = await response.json();
-        const groupedFetchedData = arrayToDateKeyMap(fetchedData);
+        const groupedFetchedData = arrayToDateKeyMap(fetchedData, userTimeZone);
 
         // 캐시에 저장
         if (!transactionCacheRef.current[group]) {
@@ -117,7 +123,7 @@ export const TransactionCacheProvider = ({
 
       incrementCount();
     },
-    [incrementCount]
+    [incrementCount, userTimeZone]
   );
 
   const fetchTransactionDataWithCache = useCallback(
@@ -125,34 +131,34 @@ export const TransactionCacheProvider = ({
     async (group: string, date: Date) => {
       //console.log("fetchTransactionDataWithCache", group, date);
       const today = new Date();
-      today.setHours(0, 0, 0, 0); // 한국 시간 기준 오늘 00:00:00
+      today.setHours(0, 0, 0, 0); // 현지 시간 기준 오늘 00:00:00
 
       const prevDate = new Date(date.getTime() - 24 * 60 * 60 * 1000);
-      prevDate.setHours(0, 0, 0, 0); // 한국 시간 기준 전날  00:00:00
+      prevDate.setHours(0, 0, 0, 0); // 현지 시간 기준 전날  00:00:00
       const currentDate = new Date(date.getTime());
-      currentDate.setHours(0, 0, 0, 0); // 한국 시간 기준 오늘 00:00:00
+      currentDate.setHours(0, 0, 0, 0); // 현지 시간 기준 오늘 00:00:00
       const nextDate = new Date(date.getTime() + 24 * 60 * 60 * 1000);
-      nextDate.setHours(0, 0, 0, 0); // 한국 시간 기준 다음날 00:00:00
+      nextDate.setHours(0, 0, 0, 0); // 현지 시간 기준 다음날 00:00:00
 
       //console.log("prevDate", prevDate);
       //console.log("nextDate", nextDate);
 
       const dateKeysUntilToday = [prevDate, currentDate, nextDate]
         .filter((d) => d <= today)
-        .map((d) => toTimezoneDateString(d, 9));
+        .map((d) => toTimezoneDateString(d, userTimeZone));
 
       // 즉시 가져올 데이터
       const immediateDates = dateKeysUntilToday.filter(
         (dateKey) =>
-          dateKey === toTimezoneDateString(currentDate, 9) && // current만 가져오되,
-          (dateKey === toTimezoneDateString(today, 9) || // current가 오늘이라면 무조건 가져오고
+          dateKey === toTimezoneDateString(currentDate, userTimeZone) && // current만 가져오되,
+          (dateKey === toTimezoneDateString(today, userTimeZone) || // current가 오늘이라면 무조건 가져오고
             !transactionCacheRef.current[group]?.[dateKey]) // 그렇지 않으면 캐시 여부 확인
       );
 
       // 천천히 가져올 데이터
       const laterDates = dateKeysUntilToday.filter(
         (dateKey) =>
-          dateKey !== toTimezoneDateString(currentDate, 9) && // current가 아닌 날짜
+          dateKey !== toTimezoneDateString(currentDate, userTimeZone) && // current가 아닌 날짜
           !transactionCacheRef.current[group]?.[dateKey] // 캐시에 없는 경우만
       );
 
@@ -164,7 +170,7 @@ export const TransactionCacheProvider = ({
         fetchAndCacheTransactions(group, laterDates); // 비동기 실행
       }
     },
-    [fetchAndCacheTransactions]
+    [fetchAndCacheTransactions, userTimeZone]
   );
 
   return (

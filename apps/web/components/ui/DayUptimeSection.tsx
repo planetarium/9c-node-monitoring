@@ -4,8 +4,10 @@ import HourUptimeGraph from "./HourUptimeGraph";
 import { useState, useEffect } from "react";
 import { useTransactionCache } from "@/src/contexts/TransactionCacheContext";
 import { useLoadingContext } from "@/src/contexts/LoadingContext";
+import { useTimeZoneContext } from "@/src/contexts/TimezoneContext";
 import { DayUptimeEntry, TransactionData } from "@/src/types";
 import { extractNodeNames } from "@/src/helper";
+import { format, toZonedTime } from "date-fns-tz";
 
 export default function DayUptimeSection({
   network,
@@ -28,6 +30,7 @@ export default function DayUptimeSection({
   const [selectedHour, setSelectedHour] = useState<number | null>(null);
   const { transactionCache } = useTransactionCache();
   const { loadingCount } = useLoadingContext();
+  const { userTimeZone } = useTimeZoneContext();
 
   const handleGraphClick = (hour: number | null) => {
     setSelectedHour((prev) => (prev === hour ? null : hour)); // 같은 시간 클릭 시 닫기
@@ -45,7 +48,9 @@ export default function DayUptimeSection({
   const networkName = node ? extractNodeNames(node) : network;
 
   /* 데이터 관리 파트 */
-  const dateString = date.toISOString().split("T")[0];
+  const dateString = format(date, "yyyy-MM-dd", {
+    timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+  });
   const selectedDateData =
     loadingCount <= 0 ? [] : transactionCache[network]?.[dateString] ?? [];
   const filteredData = node
@@ -72,8 +77,9 @@ export default function DayUptimeSection({
     filteredData.reduce<UptimeDataAccumulator>(
       (acc, item) => {
         const utcDate = new Date(item.timeStamp);
-        const hour = (utcDate.getUTCHours() + 9) % 24;
-        const minute = utcDate.getMinutes();
+        const zonedDate = toZonedTime(utcDate, userTimeZone);
+        const hour = zonedDate.getHours();
+        const minute = zonedDate.getMinutes();
 
         // 시간대별 초기화
         if (!acc.dayUptimeData[hour]) {
@@ -94,12 +100,10 @@ export default function DayUptimeSection({
         return acc;
       },
       {
-        dayUptimeData: Array(24)
-          .fill(null)
-          .map(() => ({ ...initialDayUptimeEntry })),
-        hourUptimeDataList: Array(24)
-          .fill(null)
-          .map(() => []),
+        dayUptimeData: Array.from({ length: 24 }, () => ({
+          ...initialDayUptimeEntry,
+        })),
+        hourUptimeDataList: Array.from({ length: 24 }, () => []),
       }
     );
 

@@ -1,16 +1,18 @@
-export const toTimezoneDateString = (date: Date, timezone: number) => {
-  return new Date(date.getTime() + timezone * 60 * 60 * 1000)
-    .toISOString()
-    .split("T")[0];
+import { format } from "date-fns-tz";
+
+export const toTimezoneDateString = (
+  date: Date,
+  userTimeZone: string
+): string => {
+  const value = format(date, "yyyy-MM-dd", { timeZone: userTimeZone }); // UTC → 로컬 타임존으로 변환 후 포맷
+  return value;
 };
 
-export const toTimezoneHourNumber = (date: Date, timezone: number) => {
-  return parseInt(
-    new Date(date.getTime() + timezone * 60 * 60 * 1000)
-      .toISOString()
-      .split("T")[1]
-      .split(":")[0]
-  );
+export const toTimezoneHourNumber = (
+  date: Date,
+  userTimeZone: string
+): number => {
+  return parseInt(format(date, "HH", { timeZone: userTimeZone }), 10); // UTC → 로컬 타임존으로 변환 후 시간 추출
 };
 
 export const extractNodeNames = (url: string): string => {

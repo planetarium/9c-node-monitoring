@@ -2,6 +2,7 @@ import SectionWrapper from "@/components/layouts/SectionWrapper";
 import { useTransactionCache } from "@/src/contexts/TransactionCacheContext";
 import { useNodeContext } from "@/src/contexts/NodeContext";
 import { useLoadingContext } from "@/src/contexts/LoadingContext";
+import { useTimeZoneContext } from "@/src/contexts/TimezoneContext";
 import { useState, useEffect } from "react";
 import { toTimezoneDateString, extractNodeNames } from "@/src/helper";
 
@@ -17,6 +18,7 @@ export default function StatusCard({
   const { transactionCache } = useTransactionCache();
   const { nodeNames } = useNodeContext();
   const { loadingCount } = useLoadingContext();
+  const { userTimeZone } = useTimeZoneContext();
   const [isHealthy, setIsHealthy] = useState("true");
   const [falseNodes, setFalseNodes] = useState<string[]>([]);
   const [unknownNodes, setUnknownNodes] = useState<string[]>([]);
@@ -24,10 +26,10 @@ export default function StatusCard({
   useEffect(() => {
     // 오늘 날짜
     const today = new Date();
-    const todayDate = toTimezoneDateString(today, 9);
+    const todayDate = toTimezoneDateString(today, userTimeZone);
     // 오늘 날짜의 노드 상태 가져오기
     const todayStatus =
-      loadingCount <= 0 ? [] : transactionCache[todayDate] || [];
+      loadingCount <= 0 ? [] : transactionCache?.[network]?.[todayDate] || [];
     const networkNodeNames = nodeNames[network] || [];
 
     const recentLimit = 5;
@@ -84,6 +86,7 @@ export default function StatusCard({
     isHealthy,
     setTabBackgroundColor,
     loadingCount,
+    userTimeZone,
   ]);
 
   const message =
