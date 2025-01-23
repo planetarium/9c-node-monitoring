@@ -34,4 +34,7 @@ export type DayUptimeEntry = {
   null: number;
 };
 
-export type TransactionCache = Record<string, TransactionData[]>;
+export type TransactionCache = Record<
+  string,
+  Record<string, TransactionData[]>
+>;

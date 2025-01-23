@@ -20,9 +20,19 @@ export class TransactionController {
     @Query('start') start: string,
     @Query('end') end: string,
     @Query('group') group?: string,
+    @Query('start2') start2?: string,
+    @Query('end2') end2?: string,
   ) {
-    console.log('controller:getStatus', start, end, group);
-    return await this.transactionService.fetchTransactions(start, end, group);
+    console.log('controller:getStatus', start, end, group, start2, end2);
+
+    const result = await this.transactionService.fetchTransactions(
+      start,
+      end,
+      group,
+      start2 && end2 ? { start: start2, end: end2 } : undefined, // 선택적 범위 전달
+    );
+
+    return result;
   }
 
   @Get('status/summary')

@@ -219,36 +219,71 @@ export class TransactionService {
     return;
   }
 
-  public async fetchTransactions(start: string, end: string, group?: string) {
+  public async fetchTransactions(
+    start: string,
+    end: string,
+    group?: string,
+    optionalRange?: { start: string; end: string }, // 추가 범위
+  ) {
     // 1분 전까지만 fetch (pending, temp 노출되지 않도록)
     const oneMinuteAgo = new Date(Date.now() - 60000);
-    const adjustedEnd =
-      new Date(end) > oneMinuteAgo ? oneMinuteAgo : new Date(end);
 
-    // adjustedEnd가 start보다 작아질 경우 start로 조정
-    const startDate = new Date(start);
-    if (adjustedEnd < startDate) {
-      return [];
+    const adjustRange = (start: string, end: string) => {
+      const adjustedEnd =
+        new Date(end) > oneMinuteAgo ? oneMinuteAgo : new Date(end);
+      const startDate = new Date(start);
+      if (adjustedEnd < startDate) {
+        return null; // 유효하지 않은 범위
+      }
+      return { startDate, adjustedEnd };
+    };
+
+    // 첫 번째 범위
+    const primaryRange = adjustRange(start, end);
+    if (!primaryRange) return [];
+
+    const { startDate: primaryStart, adjustedEnd: primaryEnd } = primaryRange;
+
+    // 두 번째 범위 처리 (optionalRange가 있는 경우)
+    let secondaryStart: Date | undefined;
+    let secondaryEnd: Date | undefined;
+    if (optionalRange) {
+      const secondaryRange = adjustRange(
+        optionalRange.start,
+        optionalRange.end,
+      );
+      if (secondaryRange) {
+        secondaryStart = secondaryRange.startDate;
+        secondaryEnd = secondaryRange.adjustedEnd;
+      }
     }
 
-    if (!group || group === 'all') {
-      console.log('service:fetchTransactions', start, adjustedEnd, group);
-      const transactionStatus = await this.transactionsRepository.find({
-        where: {
-          timeStamp: Between(startDate, adjustedEnd),
-        },
-      });
-      return transactionStatus;
+    const baseQuery: Record<string, any> = {};
+    if (group && group !== 'all') {
+      baseQuery.group_name = group;
     }
 
-    // group이 있을 경우 해당 group 조회 (현재는 사용되고 있지 않음)
-    const transactionStatus = await this.transactionsRepository.find({
+    // 첫 번째 범위 데이터 가져오기
+    const primaryTransactionStatus = await this.transactionsRepository.find({
       where: {
-        timeStamp: Between(startDate, adjustedEnd),
-        group_name: group,
+        ...baseQuery,
+        timeStamp: Between(primaryStart, primaryEnd),
       },
     });
-    return transactionStatus;
+
+    // 두 번째 범위 데이터 가져오기 (optionalRange가 있는 경우)
+    let secondaryTransactionStatus: any[] = [];
+    if (secondaryStart && secondaryEnd) {
+      secondaryTransactionStatus = await this.transactionsRepository.find({
+        where: {
+          ...baseQuery,
+          timeStamp: Between(secondaryStart, secondaryEnd),
+        },
+      });
+    }
+
+    // 두 범위 데이터를 병합하여 반환
+    return [...primaryTransactionStatus, ...secondaryTransactionStatus];
   }
 
   public async generateDailyTransactionSummary(start: Date, end: Date) {
@@ -351,6 +386,7 @@ export class TransactionService {
           );
           continue;
         }
+        console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
         console.log('Sender', sender, 'Recipient', recipient);
         this.accountService.updateBalance(
           groupName,
@@ -576,6 +612,7 @@ export class TransactionService {
                   }
                 `,
     });
+
     return data;
   }
 

@@ -47,12 +47,10 @@ export default function DayUptimeSection({
   /* 데이터 관리 파트 */
   const dateString = date.toISOString().split("T")[0];
   const selectedDateData =
-    loadingCount <= 0 ? [] : transactionCache[dateString] ?? [];
+    loadingCount <= 0 ? [] : transactionCache[network]?.[dateString] ?? [];
   const filteredData = node
-    ? selectedDateData?.filter((item) => item.endpoint_url === node) ?? []
-    : selectedDateData?.filter(
-        (item) => item.group_name === network.toLowerCase()
-      );
+    ? selectedDateData.filter((item) => item.endpoint_url === node)
+    : selectedDateData;
 
   const initialDayUptimeEntry: DayUptimeEntry = {
     hour: 0,

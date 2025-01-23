@@ -54,35 +54,66 @@ export const TransactionCacheProvider = ({
   const transactionCacheRef = useRef<TransactionCache>({}); // 캐시 ref
 
   // 비동기 요청을 처리하는 함수
+  // 하루가 들어올 경우 하루만 요청
+  // 이틀이 들어올 경우, 연속적이지 않다는 가정 하에 나눠서 요청 (일반적으로 중앙값을 먼저 요청하므로)
   const fetchAndCacheTransactions = useCallback(
     async (group: string, dates: string[]) => {
       if (dates.length === 0) return;
 
-      const startDateTime = formatKoreaDateToUTCDateTime(dates[0], "start");
-      const endDateTime = formatKoreaDateToUTCDateTime(
-        dates[dates.length - 1],
-        "end"
-      );
+      if (dates.length === 1) {
+        // 단일 날짜 요청
+        const startDateTime = formatKoreaDateToUTCDateTime(dates[0], "start");
+        const endDateTime = formatKoreaDateToUTCDateTime(dates[0], "end");
 
-      const response = await fetch(
-        `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime}&end=${endDateTime}`
-      );
+        const response = await fetch(
+          `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime}&end=${endDateTime}`
+        );
 
-      if (!response.ok) {
-        console.error(`Error: ${response.status} - ${response.statusText}`);
-        return null;
-      }
-
-      const fetchedData = await response.json();
-
-      const groupedFetchedData = arrayToDateKeyMap(fetchedData);
-
-      dates.forEach((date) => {
-        if (!transactionCacheRef.current[date]) {
-          transactionCacheRef.current[date] = [];
+        if (!response.ok) {
+          console.error(`Error: ${response.status} - ${response.statusText}`);
+          return null;
         }
-        transactionCacheRef.current[date] = groupedFetchedData[date] || [];
-      });
+
+        const fetchedData = await response.json();
+        const groupedFetchedData = arrayToDateKeyMap(fetchedData);
+
+        // 캐시에 저장
+        if (!transactionCacheRef.current[group]) {
+          transactionCacheRef.current[group] = {};
+        }
+
+        transactionCacheRef.current[group][dates[0]] =
+          groupedFetchedData[dates[0]] || [];
+      } else if (dates.length === 2) {
+        // 두 날짜 요청
+        const startDateTime1 = formatKoreaDateToUTCDateTime(dates[0], "start");
+        const endDateTime1 = formatKoreaDateToUTCDateTime(dates[0], "end");
+
+        const startDateTime2 = formatKoreaDateToUTCDateTime(dates[1], "start");
+        const endDateTime2 = formatKoreaDateToUTCDateTime(dates[1], "end");
+
+        const response = await fetch(
+          `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${startDateTime1}&end=${endDateTime1}&start2=${startDateTime2}&end2=${endDateTime2}`
+        );
+
+        if (!response.ok) {
+          console.error(`Error: ${response.status} - ${response.statusText}`);
+          return null;
+        }
+
+        const fetchedData = await response.json();
+        const groupedFetchedData = arrayToDateKeyMap(fetchedData);
+
+        // 캐시에 저장
+        if (!transactionCacheRef.current[group]) {
+          transactionCacheRef.current[group] = {};
+        }
+
+        dates.forEach((date) => {
+          transactionCacheRef.current[group][date] =
+            groupedFetchedData[date] || [];
+        });
+      }
 
       incrementCount();
     },
@@ -115,14 +146,14 @@ export const TransactionCacheProvider = ({
         (dateKey) =>
           dateKey === toTimezoneDateString(currentDate, 9) && // current만 가져오되,
           (dateKey === toTimezoneDateString(today, 9) || // current가 오늘이라면 무조건 가져오고
-            !transactionCacheRef.current[dateKey]) // 그렇지 않으면 캐시 여부 확인
+            !transactionCacheRef.current[group]?.[dateKey]) // 그렇지 않으면 캐시 여부 확인
       );
 
       // 천천히 가져올 데이터
       const laterDates = dateKeysUntilToday.filter(
         (dateKey) =>
           dateKey !== toTimezoneDateString(currentDate, 9) && // current가 아닌 날짜
-          !transactionCacheRef.current[dateKey] // 캐시에 없는 경우만
+          !transactionCacheRef.current[group]?.[dateKey] // 캐시에 없는 경우만
       );
 
       if (immediateDates.length > 0) {
