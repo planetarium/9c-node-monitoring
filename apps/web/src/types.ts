@@ -18,7 +18,7 @@ export type TransactionData = {
   node_name: string;
   endpoint_url: string;
   txHash: string;
-  active: "temp" | "false" | "true" | "pending" | "null" | "timeout";
+  active: "temp" | "false" | "true" | "pending" | "null" | "timeout" | "delay";
   log?: string;
   timeStamp: string;
 };
@@ -30,6 +30,7 @@ export type DayUptimeEntry = {
   false: number;
   true: number;
   timeout: number;
+  delay: number;
   total: number;
   null: number;
 };

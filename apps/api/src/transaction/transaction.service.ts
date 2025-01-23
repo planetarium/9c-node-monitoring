@@ -156,8 +156,14 @@ export class TransactionService {
         const elapsedTime =
           (new Date().getTime() - new Date(row.timeStamp).getTime()) / 1000;
         if (result.status.txStatus === 'SUCCESS') {
-          await this.updateCompletedTx(result.id);
-          console.log('updateCompletedTx', result.id);
+          if (elapsedTime <= 70) {
+            // 만약 90초 뒤인 두 번째 확인 전이라면
+            await this.updateCompletedTx(result.id);
+            console.log('updateCompletedTx', result.id, elapsedTime);
+          } else {
+            await this.updateDelayedTx(result.id);
+            console.log('updateCompletedTx', result.id, elapsedTime);
+          }
         } else if (
           result.status.txStatus === 'STAGING' ||
           result.status.txStatus === 'INCLUDED' ||
@@ -180,8 +186,15 @@ export class TransactionService {
               ['Staging timeout', elapsedTime.toString()],
               true,
             );
+          } else {
+            await this.updateDelayedTx(result.id);
+            console.log(
+              'updateDelayedTx from ',
+              result.status.txStatus,
+              'id: ',
+              result.id,
+            );
           }
-          console.log('updateStagingTx', result.id);
         } else if (result.status.txStatus === 'FAILURE') {
           await this.updateFailedTx(
             result.id,
@@ -775,7 +788,7 @@ export class TransactionService {
     return await this.transactionsRepository.find({
       where: {
         timeStamp: MoreThan(threeDaysAgo),
-        active: In(['pending', 'staging']),
+        active: In(['pending']),
       },
       select: ['id', 'endpoint_url', 'txHash', 'timeStamp'], // 필요한 필드만 선택
       order: {
@@ -789,8 +802,8 @@ export class TransactionService {
     await this.transactionsRepository.update(id, { active: 'true' });
   }
 
-  async updateStagingTx(id: number): Promise<void> {
-    await this.transactionsRepository.update(id, { active: 'staging' });
+  async updateDelayedTx(id: number): Promise<void> {
+    await this.transactionsRepository.update(id, { active: 'delay' });
   }
 
   async updateFailedTx(

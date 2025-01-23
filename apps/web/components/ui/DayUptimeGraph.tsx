@@ -4,14 +4,16 @@ import {
   ArrowLeftCircleIcon,
   ArrowRightCircleIcon,
 } from "@heroicons/react/24/solid";
-import { useEffect, useState } from "react";
+import UptimeDonut from "./UptimeDonut";
+import { useEffect, useState, useMemo } from "react";
 import { useNodeContext } from "@/src/contexts/NodeContext";
 import { useTimeZoneContext } from "@/src/contexts/TimezoneContext";
 import { toTimezoneDateString, toTimezoneHourNumber } from "@/src/helper";
 
 //TODO : 통계 수집 후 기준 명확화
 const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.34; // 데이터가 34% 이상 없으면 회색
-const DAY_UPTIME_PENDING_COUNT_THRESHOLD = 5; // 지연이 5개 이상 있으면 빨간색 (일반적으로 3분 이상 지났으면 failed 처리하므로 3개 이하)
+const DAY_UPTIME_PENDING_COUNT_THRESHOLD = 5; // 보류가 5개 이상 있으면 빨간색 (일반적으로 3분 이상 지났으면 failed 처리하므로 3개 이하)
+const DAY_UPTIME_DELAY_THRESHOLD = 0.25; //25% 이상 지연됐다면 노란색
 const DAY_UPTIME_ACTIVE_THRESHOLD = 1; // 정상이 100%인 경우에만 초록색
 const DAY_UPTIME_WARNING_THRESHOLD = 0.8; // 정상이 80% 이상 있으면 노란색
 
@@ -22,6 +24,7 @@ export default function DayUptimeGraph({
   date,
   setDate,
   dayUptimeData,
+  isBox,
 }: {
   onBarClick: (hour: number | null) => void;
   network: string;
@@ -30,6 +33,7 @@ export default function DayUptimeGraph({
   date: Date;
   setDate: React.Dispatch<React.SetStateAction<Date>>;
   dayUptimeData: DayUptimeEntry[];
+  isBox: boolean;
 }) {
   //TODO : selectedHour 바뀔 때마다 렌더링 되는데, 성능 최적화 필요한지 고민
   const { nodeNames } = useNodeContext();
@@ -67,7 +71,7 @@ export default function DayUptimeGraph({
 
   const getColorForDay = (dayUptimeData: DayUptimeEntry) => {
     const meaningfulDayUpdimeDataCount =
-      dayUptimeData.total - dayUptimeData.temp - dayUptimeData.pending; //전송 실패 및 지연은 데이터로 취급되지 않는다.
+      dayUptimeData.total - dayUptimeData.temp - dayUptimeData.pending; //전송 실패 및 보류는 데이터로 취급되지 않는다.
     if (!dayUptimeData || dayUptimeData.total === 0)
       return "rgb(229, 231, 235)"; // 회색 (정보 없음)
     else if (
@@ -81,27 +85,64 @@ export default function DayUptimeGraph({
     )
       return "rgb(239, 68, 68)"; // 빨간색 (pending 처리되지 않는 심각한 문제)
     else if (
-      dayUptimeData.true >=
+      dayUptimeData.true + dayUptimeData.delay >=
       meaningfulDayUpdimeDataCount * DAY_UPTIME_ACTIVE_THRESHOLD
     )
-      return "rgb(74, 222, 128)"; // 초록색 (정상)
+      return dayUptimeData.delay >=
+        meaningfulDayUpdimeDataCount * DAY_UPTIME_DELAY_THRESHOLD
+        ? "rgb(250, 204, 21)" // 노란색 (전부 정상적이어도 일부가 지연됐다면 경고)
+        : "rgb(74, 222, 128)";
+    // 초록색 (정상)
     else if (
-      dayUptimeData.true >=
+      dayUptimeData.true + dayUptimeData.delay >=
       meaningfulDayUpdimeDataCount * DAY_UPTIME_WARNING_THRESHOLD
     )
       return "rgb(250, 204, 21)"; // 노란색 (경고)
     else return "rgb(239, 68, 68)"; // 빨간색 (오류 개수 허용치 이상) or (true가 경고 범위 아래)
   };
 
+  const useDayUptimeCount = (dayUptimeData: DayUptimeEntry[]) => {
+    const dayUptimeCount = useMemo(() => {
+      return dayUptimeData.reduce(
+        (acc, curr) => ({
+          pending: acc.pending + curr.pending,
+          temp: acc.temp + curr.temp,
+          false: acc.false + curr.false,
+          true: acc.true + curr.true,
+          timeout: acc.timeout + curr.timeout,
+          delay: acc.delay + curr.delay,
+          total: acc.total + curr.total,
+          null: acc.null + curr.null,
+        }),
+        {
+          pending: 0,
+          temp: 0,
+          false: 0,
+          true: 0,
+          timeout: 0,
+          delay: 0,
+          total: 0,
+          null: 0,
+        }
+      );
+    }, [dayUptimeData]);
+
+    return dayUptimeCount;
+  };
+
   const hoverContentForDay = (label: string, uptimeData: DayUptimeEntry) => {
     return {
       uptime: `Hour: ${label}, Uptime: ${
-        uptimeData.total - uptimeData.temp >
+        uptimeData.total - uptimeData.temp - uptimeData.pending >
         DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD * maxDataNumber
-          ? `${Math.round((uptimeData.true / uptimeData.total) * 100)}%`
+          ? `${overallUptime || 0}%`
           : "not enough data"
       }`,
-      count: `Total: ${uptimeData.total}, Active: ${uptimeData.true}, Error: ${uptimeData.false}, Timeout: ${uptimeData.timeout}, Pending: ${uptimeData.pending}, Dashboard Failure: ${uptimeData.temp}, Null: ${uptimeData.null}`,
+      count: `Total: ${uptimeData.total}, Active: ${
+        uptimeData.true
+      }, Delayed: ${uptimeData.delay}, Failure: ${uptimeData.false}, Timeout: ${
+        uptimeData.timeout
+      }, Error: ${uptimeData.pending + uptimeData.temp + uptimeData.null}`,
     }; //TODO 데이터 타입에 따라 수정
   };
 
@@ -143,20 +184,37 @@ export default function DayUptimeGraph({
     };
   } | null>(null);
 
+  const dayUptimeCount = useDayUptimeCount(dayUptimeData);
+  const overallUptime =
+    dayUptimeCount?.total > 0
+      ? parseFloat(
+          (
+            ((dayUptimeCount.true + dayUptimeCount.delay) /
+              dayUptimeCount.total) *
+            100
+          ).toFixed(1)
+        )
+      : 0;
+
   if (dayUptimeData.length === 0) return null;
 
   return (
     <div>
-      <div className="flex items-center gap-2 transform-none">
+      <div className="flex items-center gap-2">
         <button onClick={() => handleDateChange(date, "prev")}>
           <ArrowLeftCircleIcon className="w-5 h-5" />
         </button>
         <h2 className="text-xl font-semibold">
-          {network} {toTimezoneDateString(date, userTimeZone)} Uptime
+          {isBox
+            ? `${network}`
+            : `${network} ${toTimezoneDateString(date, userTimeZone)} Uptime`}
         </h2>
         <button onClick={() => handleDateChange(date, "next")}>
           <ArrowRightCircleIcon className="w-5 h-5" />
         </button>
+        <div className="ml-1.5">
+          <UptimeDonut uptime={overallUptime} />
+        </div>
         <button
           onClick={handleToggle}
           className={`p-1 hover:bg-gray-100 rounded-full transition-transform duration-200 ${

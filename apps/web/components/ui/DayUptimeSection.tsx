@@ -65,6 +65,7 @@ export default function DayUptimeSection({
     true: 0,
     null: 0,
     timeout: 0,
+    delay: 0,
     total: 0,
   };
 
@@ -119,6 +120,7 @@ export default function DayUptimeSection({
             setDate={setDate}
             node={node || "all"}
             dayUptimeData={dayUptimeData}
+            isBox={isBox}
           />
         </div>
         {node && selectedHour !== null && (

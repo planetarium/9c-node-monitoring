@@ -23,11 +23,14 @@ import { useEffect, useState } from "react";
 const getColorForHour = (item: TransactionData) => {
   //TODO 데이터 타입에 따라 색 기준 결정
   if (item.active === "true") return "rgb(74, 222, 128)"; // 초록색 (정상)
-  if (item.active === "temp") return "rgb(189, 193, 199)"; // 회색 (대시보드 실패)
   if (item.active === "false") return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
-  if (item.active === "pending") return "rgb(169, 172, 178)"; // 노란색 (지연 경고)
-  if (item.active === "null") return "rgb(229, 231, 235)"; // 연한 회색 (정보 없음)
+  if (item.active === "delay") return "rgb(250, 204, 21)"; // 노란색 (지연 경고)
   if (item.active === "timeout") return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
+  /* errors */
+  if (item.active === "pending") return "rgb(109, 111, 115)"; // 진한 회색 (지연 에러)
+  if (item.active === "temp") return "rgb(109, 111, 115)"; // 진한 회색 (대시보드 실패)
+  /*no data*/
+  if (item.active === "null") return "rgb(229, 231, 235)"; // 연한 회색 (정보 없음)
 };
 
 const getLabelForHour = (index: number) => {
@@ -40,13 +43,15 @@ const hoverContentForHour = (label: string, item: TransactionData) => {
     item.active === "true"
       ? "active"
       : item.active === "temp"
-      ? "dashboard failure"
+      ? "dashboard error"
       : item.active === "pending"
-      ? "pending"
+      ? "pending" //보류
       : item.active === "null"
       ? "no data"
       : item.active === "timeout"
       ? "timeout"
+      : item.active === "delay"
+      ? "delayed"
       : "failed";
   const failLog = item.log ? item.log.split(",")[0] : null;
   return {

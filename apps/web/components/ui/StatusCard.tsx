@@ -43,7 +43,8 @@ export default function StatusCard({
           new Date(item.timeStamp).getTime() > recentTime &&
           (item.active === "true" ||
             item.active === "false" ||
-            item.active === "timeout")
+            item.active === "timeout" ||
+            item.active === "delay")
       );
       return nodeStatus;
     });
@@ -64,6 +65,13 @@ export default function StatusCard({
       ) {
         isHealthyState = "false";
         newFalseNodes.push(networkNodeNames[index]);
+      } else if (
+        nodeStatus.active === "true" ||
+        nodeStatus.active === "delay"
+      ) {
+        continue;
+      } else {
+        console.error("StatusCard unkown state : ", nodeStatus.active);
       }
     }
 
