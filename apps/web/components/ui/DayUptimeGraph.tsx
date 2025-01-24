@@ -215,14 +215,16 @@ export default function DayUptimeGraph({
         <div className="ml-1.5">
           <UptimeDonut uptime={overallUptime} />
         </div>
-        <button
-          onClick={handleToggle}
-          className={`p-1 hover:bg-gray-100 rounded-full transition-transform duration-200 ${
-            selectedHour ? "rotate-90" : "rotate-0"
-          }`}
-        >
-          <ChevronRightIcon className="w-5 h-5" />
-        </button>
+        {isBox && (
+          <button
+            onClick={handleToggle}
+            className={`p-1 hover:bg-gray-100 rounded-full transition-transform duration-200 ${
+              selectedHour ? "rotate-90" : "rotate-0"
+            }`}
+          >
+            <ChevronRightIcon className="w-5 h-5" />
+          </button>
+        )}
       </div>
       <div className="mt-3">
         <div className="grid grid-cols-24">

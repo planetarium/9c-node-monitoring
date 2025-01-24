@@ -1,4 +1,5 @@
 // components/layouts/Tab.tsx
+import MonthUptimeCalendar from "../ui/MonthUptimeCalendar";
 import StatusCard from "../ui/StatusCard";
 import UptimeList from "../ui/UptimeList";
 
@@ -22,6 +23,7 @@ export default function Tab({
         tabBackgroundColor={tabBackgroundColor}
         setTabBackgroundColor={setTabBackgroundColor}
       />
+      <MonthUptimeCalendar onDayClick={setDate} date={new Date()} />
       <UptimeList network={network} date={date} setDate={setDate} />
     </div>
   );

@@ -19,7 +19,7 @@ export default function UptimeList({
 
   return (
     <div style={{ backgroundColor: "var(--background)" }}>
-      <div className="mt-7 mb-8">
+      <div className="mb-8">
         <DayUptimeSection
           network={network}
           isBox={false}
