@@ -1,5 +1,6 @@
 import { Controller, Query, Get, Post, Patch } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
+import { DateTime } from 'luxon';
 
 @Controller('transactions')
 export class TransactionController {
@@ -35,11 +36,34 @@ export class TransactionController {
     return result;
   }
 
-  @Get('status/summary')
-  async getSummary(@Query('start') start: string, @Query('end') end: string) {
+  @Get('summary')
+  async getSummary(
+    @Query('year') year: number,
+    @Query('month') month: number,
+    @Query('timezone') timezone: string,
+    @Query('network') network: string,
+  ) {
+    // 로컬 시간 기준 월의 시작과 끝
+    const startOfMonth = DateTime.fromObject(
+      { year, month, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 },
+      { zone: timezone },
+    );
+    const endOfMonth = startOfMonth.endOf('month');
+
+    // `invalid` 체크 추가
+    if (!startOfMonth.isValid || !endOfMonth.isValid) {
+      throw new Error('Invalid DateTime conversion');
+    }
+
+    // UTC 변환
+    const utcStartDate = startOfMonth.toUTC().toISO();
+    const utcEndDate = endOfMonth.toUTC().toISO();
+
     return await this.transactionService.generateDailyTransactionSummary(
-      new Date(start),
-      new Date(end),
+      utcStartDate,
+      utcEndDate,
+      timezone,
+      network,
     );
   }
 

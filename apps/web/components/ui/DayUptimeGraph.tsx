@@ -185,12 +185,14 @@ export default function DayUptimeGraph({
   } | null>(null);
 
   const dayUptimeCount = useDayUptimeCount(dayUptimeData);
+  const meaningfulUptimeCount =
+    dayUptimeCount.total - dayUptimeCount.temp - dayUptimeCount.pending;
   const overallUptime =
-    dayUptimeCount?.total > 0
+    meaningfulUptimeCount > 0
       ? parseFloat(
           (
             ((dayUptimeCount.true + dayUptimeCount.delay) /
-              dayUptimeCount.total) *
+              meaningfulUptimeCount) *
             100
           ).toFixed(1)
         )

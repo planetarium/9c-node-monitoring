@@ -23,7 +23,11 @@ export default function Tab({
         tabBackgroundColor={tabBackgroundColor}
         setTabBackgroundColor={setTabBackgroundColor}
       />
-      <MonthUptimeCalendar onDayClick={setDate} date={new Date()} />
+      <MonthUptimeCalendar
+        onDayClick={setDate}
+        date={new Date()}
+        network={network}
+      />
       <UptimeList network={network} date={date} setDate={setDate} />
     </div>
   );

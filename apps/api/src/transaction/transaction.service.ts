@@ -20,6 +20,9 @@ import * as crypto from 'crypto';
 import { ExceptionsHandler } from '@nestjs/core/exceptions/exceptions-handler';
 import e, { response } from 'express';
 import { group } from 'node:console';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { endOfMonth, startOfMonth } from 'date-fns';
+import { DateTime } from 'luxon';
 
 @Injectable()
 export class TransactionService {
@@ -55,7 +58,7 @@ export class TransactionService {
   async onModuleInit(): Promise<void> {
     // 서비스 초기화 시 계정을 캐싱
     this.accounts = this.accountService.getAccounts();
-    console.log('Cached accounts:', this.accounts);
+    // console.log('Cached accounts:', this.accounts);
   }
 
   /* controller 호출 함수 */
@@ -299,9 +302,104 @@ export class TransactionService {
     return [...primaryTransactionStatus, ...secondaryTransactionStatus];
   }
 
-  public async generateDailyTransactionSummary(start: Date, end: Date) {
-    // 나머지 기능 전부 완료 후 필요 시 개발
-    return;
+  public async generateDailyTransactionSummary(
+    start: string,
+    end: string,
+    timezone: string,
+    network: string,
+  ) {
+    // 1분 전까지만 데이터 처리
+    const oneMinuteAgo = new Date(Date.now() - 60000);
+
+    // 날짜 범위 조정 로직
+    const adjustRange = (start: string, end: string) => {
+      const adjustedEnd =
+        new Date(end) > oneMinuteAgo ? oneMinuteAgo : new Date(end);
+      const startDate = new Date(start);
+      if (adjustedEnd < startDate) {
+        return null; // 유효하지 않은 범위
+      }
+      return { startDate, adjustedEnd };
+    };
+
+    const endDate = new Date(end);
+    const startDate = new Date(start);
+    const startUtc = DateTime.fromJSDate(startDate).toFormat(
+      'yyyy-MM-dd HH:mm:ss',
+    );
+    const endUtc = DateTime.fromJSDate(endDate).toFormat('yyyy-MM-dd HH:mm:ss');
+
+    const adjustedEnd = endDate > oneMinuteAgo ? oneMinuteAgo : endDate;
+    const adjustedEndAfterStart =
+      adjustedEnd < startDate ? startDate : adjustedEnd;
+
+    const queryEndUtc = DateTime.fromJSDate(adjustedEndAfterStart).toFormat(
+      'yyyy-MM-dd HH:mm:ss',
+    ); //쿼리는 1분 이상 된 데이터로 진행한다.
+
+    const rawData =
+      startUtc === queryEndUtc // 조정된 end가 현재시점 -1분을 넘어서면 조회하지 않는다.
+        ? []
+        : await this.transactionsRepository
+            .createQueryBuilder('node_health')
+            .select([
+              `DATE_FORMAT(CONVERT_TZ(node_health.timeStamp, 'UTC', :timezone), '%Y-%m-%d') AS localDate`,
+              `SUM(CASE WHEN node_health.active IN ('true', 'delay') THEN 1 ELSE 0 END) AS active`,
+              `SUM(CASE WHEN node_health.active NOT IN ('pending', 'null', 'temp') THEN 1 ELSE 0 END) AS total`,
+            ])
+            .where('node_health.timeStamp BETWEEN :startDate AND :endDate', {
+              startDate: startUtc,
+              endDate: queryEndUtc,
+              timezone,
+            })
+            .andWhere('node_health.group_name = :network', { network })
+            .groupBy('localDate')
+            .orderBy('localDate', 'ASC')
+            .getRawMany<{
+              localDate: string;
+              active: string;
+              total: string;
+            }>();
+
+    const dataMap = new Map<string, { active: number; total: number }>();
+    for (const row of rawData) {
+      const dateKey = row.localDate;
+      dataMap.set(dateKey, {
+        active: Number(row.active),
+        total: Number(row.total),
+      });
+    }
+    // 3) start ~ end까지 매일 순회
+    function getDateArray(start: Date, end: Date): string[] {
+      const result: string[] = [];
+      const current = new Date(`${start}z`);
+      while (current <= end) {
+        // current를 ISO 문자열로 만들고 앞 10자리를 떼면 'YYYY-MM-DD'
+        const yyyymmdd = current.toISOString().slice(0, 10);
+        result.push(yyyymmdd);
+        current.setDate(current.getDate() + 1);
+      }
+      return result;
+    }
+    const startUTCDate = new Date(startUtc);
+    const endUTCDate = new Date(endUtc);
+    const dates = getDateArray(startUTCDate, endUTCDate);
+
+    type DayData = {
+      active: number;
+      total: number;
+    };
+    // 4) Map에 있으면 가져오고, 없으면 0
+    const result: DayData[] = dates.map((d: string) => {
+      const found = dataMap.get(d);
+      return {
+        localDate: d,
+        active: found ? found.active : 0,
+        total: found ? found.total : 0,
+      };
+    });
+
+    return result;
   }
 
   /* helper 함수 */
