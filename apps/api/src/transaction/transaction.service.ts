@@ -448,30 +448,52 @@ export class TransactionService {
     rpcEndpoints: string[],
     timeStamp: Date,
   ) {
-    // 계좌 조회 알고리즘 아직 구현하지 못함
-    // 일단 endpoint를 accounts 이하의 수로 나눠 가장 많은 계정을 사용하는 것으로 구현
-    let usingAccountNumber = 2;
-    for (let i = this.accounts.length; i > 2; i--) {
-      if (rpcEndpoints.length % i === 0) {
-        usingAccountNumber = i;
-        break;
-      }
-    }
-    console.log('rpcEndpoints.length', rpcEndpoints.length);
-    console.log('usingAccountNumber', usingAccountNumber);
+    this.accountService.clearUsedAccounts(); //이전 사용 기록 초기화 (이번 회차에서 계좌의 사용 여부를 확인하기 위함)
 
     for (let i = 0; i < rpcEndpoints.length; i++) {
-      // if (i >= this.accounts.length) { // 기존 코드는 그냥 length 조건으로 활용
-      //   console.log('More endpoints than accounts');
-      // }
-      const accountNumber = i % usingAccountNumber;
-      const senderIndex = accountNumber;
-      const recieverIndex = this.isBalanceChecked
-        ? (this.accountService.getLowestBalanceAccount(groupName) ??
-          (accountNumber + 1) % usingAccountNumber)
-        : (accountNumber + 1) % usingAccountNumber;
+      const accountNumber = i % this.accounts.length;
+      const transactionPair = this.accountService.getTransactionPair(groupName);
+      if (!transactionPair) {
+        console.error(
+          `[ERROR] No available transaction pairs for ${groupName}. Skipping this request.`,
+        );
+        await this.updateTempTx(
+          rpcEndpoints[i],
+          '',
+          timeStamp,
+          'false',
+          'No available accounts',
+        );
+        continue;
+      }
+      const { senderIndex, receiverIndex } = transactionPair;
+
+      if (senderIndex === undefined || receiverIndex === undefined) {
+        console.error(
+          `[ERROR] Invalid transaction pair received. Skipping this request.`,
+        );
+        await this.updateTempTx(
+          rpcEndpoints[i],
+          '',
+          timeStamp,
+          'temp',
+          'Invalid transaction pair',
+        );
+        continue;
+      }
+
+      console.log(
+        groupName,
+        ', endpoint-',
+        i,
+        ' : ',
+        senderIndex,
+        '->',
+        receiverIndex,
+      );
+
       const sender = this.accounts[senderIndex].address;
-      const recipient = this.accounts[recieverIndex].address;
+      const recipient = this.accounts[receiverIndex].address;
       console.log(
         'accountNumber',
         accountNumber,
@@ -481,7 +503,7 @@ export class TransactionService {
         recipient,
       );
       let action;
-      const amount = 1n;
+      const amount = BigInt(1);
       if (groupName === 'odin')
         action = this.makeTransferInOdin(sender, recipient, amount);
       else action = this.makeTransferInHeimdall(sender, recipient, amount);
@@ -489,7 +511,7 @@ export class TransactionService {
         const txHash = await this.sendTx(
           rpcEndpoints[i],
           action,
-          this.accounts[i], //TODO: 만약 nonce를 직접 처리하고, 전송 계좌를 바꿔가며 더 높은 안정성 추구한다면 senderIndex로 수정해야 한다.
+          this.accounts[senderIndex],
         );
         if (!txHash) {
           console.error(
@@ -506,7 +528,7 @@ export class TransactionService {
         );
         this.accountService.updateBalance(
           groupName,
-          recieverIndex,
+          receiverIndex,
           Number(amount) / 100,
         );
         await this.updateTempTx(
