@@ -190,9 +190,8 @@ export class TransactionService {
               true,
             );
           } else {
-            await this.updateDelayedTx(result.id);
             console.log(
-              'updateDelayedTx from ',
+              'did not update delyed Tx from ',
               result.status.txStatus,
               'id: ',
               result.id,
@@ -308,22 +307,12 @@ export class TransactionService {
     timezone: string,
     network: string,
   ) {
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+
     // 1분 전까지만 데이터 처리
     const oneMinuteAgo = new Date(Date.now() - 60000);
 
-    // 날짜 범위 조정 로직
-    const adjustRange = (start: string, end: string) => {
-      const adjustedEnd =
-        new Date(end) > oneMinuteAgo ? oneMinuteAgo : new Date(end);
-      const startDate = new Date(start);
-      if (adjustedEnd < startDate) {
-        return null; // 유효하지 않은 범위
-      }
-      return { startDate, adjustedEnd };
-    };
-
-    const endDate = new Date(end);
-    const startDate = new Date(start);
     const startUtc = DateTime.fromJSDate(startDate).toFormat(
       'yyyy-MM-dd HH:mm:ss',
     );
@@ -361,6 +350,8 @@ export class TransactionService {
               total: string;
             }>();
 
+    console.log('logging timezone', startUtc, endUtc, queryEndUtc);
+
     const dataMap = new Map<string, { active: number; total: number }>();
     for (const row of rawData) {
       const dateKey = row.localDate;
@@ -370,20 +361,34 @@ export class TransactionService {
       });
     }
     // 3) start ~ end까지 매일 순회
-    function getDateArray(start: Date, end: Date): string[] {
+    function getDateArray(start: Date, end: Date, timeZone: string): string[] {
       const result: string[] = [];
-      const current = new Date(`${start}z`);
+      const current = new Date(start);
+
+      console.log('getDateArray current', current);
+
       while (current <= end) {
-        // current를 ISO 문자열로 만들고 앞 10자리를 떼면 'YYYY-MM-DD'
-        const yyyymmdd = current.toISOString().slice(0, 10);
-        result.push(yyyymmdd);
+        // 로컬 타임존 기준 날짜 변환
+        const localDate = new Intl.DateTimeFormat('en-CA', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          timeZone,
+        })
+          .format(current)
+          .replace(/(\d+)-(\d+)-(\d+)/, '$1-$2-$3'); // YYYY-MM-DD 포맷
+
+        result.push(localDate);
+
+        // 로컬 기준으로 하루 증가 (setUTCDate 대신 setDate 사용)
         current.setDate(current.getDate() + 1);
       }
       return result;
     }
+
     const startUTCDate = new Date(startUtc);
     const endUTCDate = new Date(endUtc);
-    const dates = getDateArray(startUTCDate, endUTCDate);
+    const dates = getDateArray(startUTCDate, endUTCDate, timezone);
 
     type DayData = {
       active: number;

@@ -11,7 +11,7 @@ import { useTimeZoneContext } from "@/src/contexts/TimezoneContext";
 import { toTimezoneDateString, toTimezoneHourNumber } from "@/src/helper";
 
 //TODO : 통계 수집 후 기준 명확화
-const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.34; // 데이터가 34% 이상 없으면 회색
+const DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD = 0.25; // 데이터가 25% 이상 없으면 회색
 const DAY_UPTIME_PENDING_COUNT_THRESHOLD = 5; // 보류가 5개 이상 있으면 빨간색 (일반적으로 3분 이상 지났으면 failed 처리하므로 3개 이하)
 const DAY_UPTIME_DELAY_THRESHOLD = 0.25; //25% 이상 지연됐다면 노란색
 const DAY_UPTIME_ACTIVE_THRESHOLD = 1; // 정상이 100%인 경우에만 초록색
@@ -131,11 +131,20 @@ export default function DayUptimeGraph({
   };
 
   const hoverContentForDay = (label: string, uptimeData: DayUptimeEntry) => {
+    const meaningfulDataCount =
+      uptimeData.total - uptimeData.temp - uptimeData.pending;
+    const uptime =
+      meaningfulDataCount > 0
+        ? (
+            ((uptimeData.delay + uptimeData.true) / meaningfulDataCount) *
+            100
+          ).toFixed(1)
+        : 0;
     return {
       uptime: `Hour: ${label}, Uptime: ${
-        uptimeData.total - uptimeData.temp - uptimeData.pending >
+        meaningfulDataCount >
         DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD * maxDataNumber
-          ? `${overallUptime || 0}%`
+          ? `${uptime || 0}%`
           : "not enough data"
       }`,
       count: `Total: ${uptimeData.total}, Active: ${

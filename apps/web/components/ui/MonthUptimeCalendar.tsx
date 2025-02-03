@@ -65,16 +65,16 @@ const MonthUptimeCalendar: React.FC<MonthUptimeCalendarProps> = ({
         const year = Number(yearStr);
         const month = Number(monthStr);
 
-        if (!year || !month || isNaN(year) || isNaN(month)) {
-          console.error("Invalid year or month:", year, month);
-          return;
-        }
+        const start = new Date(year, month - 1, 1, 0, 0, 0); // 해당 월의 첫째 날 (00:00:00)
+        const end = new Date(year, month, 0, 23, 59, 59); // 해당 월의 마지막 날 (23:59:59)
 
-        console.log("Fetching data for:", monthKey, userTimeZone);
+        // 날짜를 ISO 형식으로 변환하여 API에 전달
+        const startISO = start.toISOString();
+        const endISO = end.toISOString();
 
-        // 예시 API: /transactions/summary?year=2025&month=1&timezone=Asia/Seoul
+        // API 요청
         const response = await fetch(
-          `${process.env.NEXT_API_URL}/transactions/summary?year=${year}&month=${month}&timezone=${userTimeZone}&network=${lowerCaseNetwork}`
+          `${process.env.NEXT_API_URL}/transactions/summary?start=${startISO}&end=${endISO}&timezone=${userTimeZone}&network=${lowerCaseNetwork}`
         );
 
         if (!response.ok) {
@@ -82,7 +82,6 @@ const MonthUptimeCalendar: React.FC<MonthUptimeCalendarProps> = ({
         }
 
         const data = await response.json();
-        console.log("Fetched data:", monthKey, data);
 
         setMonthData((prevData) => ({
           ...prevData,

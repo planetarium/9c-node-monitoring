@@ -38,30 +38,26 @@ export class TransactionController {
 
   @Get('summary')
   async getSummary(
-    @Query('year') year: number,
-    @Query('month') month: number,
+    @Query('start') start: string,
+    @Query('end') end: string,
     @Query('timezone') timezone: string,
     @Query('network') network: string,
   ) {
-    // 로컬 시간 기준 월의 시작과 끝
-    const startOfMonth = DateTime.fromObject(
-      { year, month, day: 1, hour: 0, minute: 0, second: 0, millisecond: 0 },
-      { zone: timezone },
-    );
-    const endOfMonth = startOfMonth.endOf('month');
-
-    // `invalid` 체크 추가
-    if (!startOfMonth.isValid || !endOfMonth.isValid) {
-      throw new Error('Invalid DateTime conversion');
+    if (!start || !end) {
+      throw new Error('Missing required parameters: start and end');
     }
 
-    // UTC 변환
-    const utcStartDate = startOfMonth.toUTC().toISO();
-    const utcEndDate = endOfMonth.toUTC().toISO();
+    // start와 end가 올바른 형식인지 검증
+    const startDate = DateTime.fromISO(start, { zone: timezone });
+    const endDate = DateTime.fromISO(end, { zone: timezone });
+
+    if (!startDate.isValid || !endDate.isValid) {
+      throw new Error('Invalid DateTime format');
+    }
 
     return await this.transactionService.generateDailyTransactionSummary(
-      utcStartDate,
-      utcEndDate,
+      start,
+      end,
       timezone,
       network,
     );
