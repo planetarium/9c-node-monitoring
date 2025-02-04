@@ -126,6 +126,127 @@ export const TransactionCacheProvider = ({
     [incrementCount, userTimeZone]
   );
 
+  //오늘 데이터 중 바뀔 가능성이 있는 부분만 받아오는 함수
+  const fetchLatestTransactionUpdates = useCallback(
+    async (group: string) => {
+      const todayKey = toTimezoneDateString(new Date(), userTimeZone);
+      const yesterdayKey = toTimezoneDateString(
+        new Date(new Date().setDate(new Date().getDate() - 1)),
+        userTimeZone
+      );
+
+      if (!transactionCacheRef.current[group]) {
+        transactionCacheRef.current[group] = {};
+      }
+
+      if (!transactionCacheRef.current[group][todayKey]) {
+        transactionCacheRef.current[group][todayKey] = [];
+      }
+
+      const cachedTransactions =
+        transactionCacheRef.current[group]?.[todayKey] || [];
+
+      // 오늘 00:00:00(local time)의 UTC 기준 타임스탬프
+      const todayMidnightLocal = new Date();
+      todayMidnightLocal.setHours(0, 0, 0, 0);
+      const todayMidnightUTC = new Date(
+        formatLocalDateToUTCDateTime(
+          toTimezoneDateString(todayMidnightLocal, userTimeZone),
+          "start"
+        )
+      );
+
+      // 마지막 요소의 timestamp 사용 (정렬되어 있다고 가정)
+      const lastFetchedTimestamp =
+        cachedTransactions.length > 0
+          ? new Date(
+              cachedTransactions[cachedTransactions.length - 1].timeStamp
+            )
+          : null;
+
+      const fetchStartDate = lastFetchedTimestamp
+        ? new Date(lastFetchedTimestamp.getTime() - 5 * 60 * 1000) // 최종 데이터 5분 전까지 가져오기
+        : todayMidnightUTC; // 캐시가 없으면 00:00:00부터 가져오기
+      const fetchStartTime = fetchStartDate.toISOString();
+      const fetchEndTime = new Date().toISOString();
+
+      const response = await fetch(
+        `${process.env.NEXT_API_URL}/transactions/status?group=${group}&start=${fetchStartTime}&end=${fetchEndTime}`
+      );
+
+      if (!response.ok) {
+        console.error(`Error: ${response.status} - ${response.statusText}`);
+        return;
+      }
+
+      const newTransactions: TransactionData[] = await response.json();
+
+      if (newTransactions.length > 0) {
+        // 00:00:00(local time) 기준으로 데이터 나누기
+        const yesterdayData = newTransactions.filter(
+          (t) => new Date(t.timeStamp) < todayMidnightUTC
+        );
+
+        const todayData = newTransactions.filter(
+          (t) => new Date(t.timeStamp) >= todayMidnightUTC
+        );
+
+        if (yesterdayData.length > 0) {
+          // 최신 데이터가 정각을 기준으로 나눠진다면
+          // 기존 캐시의 전날 데이터와 병합
+          // 기존 캐시의 전날 데이터에서 fetchStartTime 이전 데이터까지만 유지
+          const trimmedYesterdayTransactions = trimTransactionsByTime(
+            transactionCacheRef.current[group]?.[yesterdayKey] || [],
+            fetchStartDate
+          );
+
+          // 잘린 데이터 + 새로운 yesterdayData 병합
+          transactionCacheRef.current[group][yesterdayKey] = [
+            ...trimmedYesterdayTransactions,
+            ...yesterdayData,
+          ];
+          // 오늘 데이터는 새로 덮어쓰기
+          transactionCacheRef.current[group][todayKey] = todayData;
+        } else {
+          if (fetchStartTime) {
+            const trimmedCachedTransactions = trimTransactionsByTime(
+              cachedTransactions,
+              fetchStartDate
+            );
+
+            transactionCacheRef.current[group][todayKey] = [
+              ...trimmedCachedTransactions,
+              ...todayData,
+            ];
+          } else {
+            // 캐시가 비어 있는 경우 그대로 병합
+            transactionCacheRef.current[group][todayKey] = [...todayData];
+          }
+        }
+      }
+
+      console.log("data", transactionCacheRef.current[group]);
+    },
+    [userTimeZone]
+  );
+
+  const trimTransactionsByTime = (
+    transactions: TransactionData[],
+    cutoffDate: Date
+  ) => {
+    let cutIndex = transactions.length; // 기본적으로 전체 유지
+
+    for (let i = transactions.length - 1; i >= 0; i--) {
+      const txTime = new Date(transactions[i].timeStamp);
+      if (txTime < cutoffDate) {
+        cutIndex = i + 1; // fetchStartTime 이전 데이터까지만 유지
+        break;
+      }
+    }
+
+    return transactions.slice(0, cutIndex);
+  };
+
   const fetchTransactionDataWithCache = useCallback(
     //todo: usecallback 써야하나?
     async (group: string, date: Date) => {
@@ -163,14 +284,23 @@ export const TransactionCacheProvider = ({
       );
 
       if (immediateDates.length > 0) {
-        await fetchAndCacheTransactions(group, immediateDates);
+        if (immediateDates[0] === toTimezoneDateString(today, userTimeZone)) {
+          await fetchLatestTransactionUpdates(group); // 오늘이라면 동기적으로 최신 데이터만
+        } else {
+          await fetchAndCacheTransactions(group, immediateDates); // 아니라면 동기적으로 모든 데이터
+        }
       }
 
       if (laterDates.length > 0) {
         fetchAndCacheTransactions(group, laterDates); // 비동기 실행
       }
+
+      if (immediateDates[0] !== toTimezoneDateString(today, userTimeZone)) {
+        //만약 오늘 데이터 가져오지 않았다면 비동기로 처리
+        fetchLatestTransactionUpdates(group);
+      }
     },
-    [fetchAndCacheTransactions, userTimeZone]
+    [fetchAndCacheTransactions, fetchLatestTransactionUpdates, userTimeZone]
   );
 
   return (
