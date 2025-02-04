@@ -225,8 +225,9 @@ export const TransactionCacheProvider = ({
       }
 
       //console.log("data", transactionCacheRef.current[group]);
+      incrementCount();
     },
-    [userTimeZone]
+    [userTimeZone, incrementCount]
   );
 
   const trimTransactionsByTime = (
