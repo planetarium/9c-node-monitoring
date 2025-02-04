@@ -51,7 +51,6 @@ const arrayToDateKeyMap = (
 };
 
 export const TransactionCacheProvider = ({
-  //TODO 추가로 odin, heimdal 둘 다 캐시하고 있으니 성능상 필요하다면 한 쪽만 캐시하도록 수정
   children,
 }: TransactionCacheProviderProps) => {
   const { incrementCount } = useLoadingContext();
@@ -225,7 +224,7 @@ export const TransactionCacheProvider = ({
         }
       }
 
-      console.log("data", transactionCacheRef.current[group]);
+      //console.log("data", transactionCacheRef.current[group]);
     },
     [userTimeZone]
   );
@@ -248,7 +247,6 @@ export const TransactionCacheProvider = ({
   };
 
   const fetchTransactionDataWithCache = useCallback(
-    //todo: usecallback 써야하나?
     async (group: string, date: Date) => {
       //console.log("fetchTransactionDataWithCache", group, date);
       const today = new Date();

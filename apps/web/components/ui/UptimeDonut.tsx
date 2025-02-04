@@ -1,11 +1,28 @@
-import React from "react";
+import React, { useState } from "react";
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip } from "chart.js";
+import { DayUptimeEntry } from "@/src/types";
 
 // Chart.js 등록
 ChartJS.register(ArcElement, Tooltip);
 
-export default function UptimeDonut({ uptime = 0 }: { uptime: number }) {
+export default function UptimeDonut({
+  uptime = 0,
+  counts = {
+    pending: 0,
+    temp: 0,
+    false: 0,
+    true: 0,
+    timeout: 0,
+    delay: 0,
+    total: 0,
+    null: 0,
+    hour: 0,
+  },
+}: {
+  uptime: number;
+  counts: DayUptimeEntry;
+}) {
   // Uptime 데이터 계산
   const value = uptime;
 
@@ -35,14 +52,61 @@ export default function UptimeDonut({ uptime = 0 }: { uptime: number }) {
     },
   };
 
+  const [hoveredItem, setHoveredItem] = useState<{
+    x: number;
+    y: number;
+    content: {
+      uptime: string;
+      count: string;
+    };
+  } | null>(null);
+
+  const hoverContent = (uptimeData: DayUptimeEntry) => {
+    return {
+      uptime: `Uptime: ${uptime || 0}%`,
+      count: `Total: ${uptimeData.total}, Active: ${
+        uptimeData.true
+      }, Delayed: ${uptimeData.delay}, Failure: ${uptimeData.false}, Timeout: ${
+        uptimeData.timeout
+      }, Error: ${uptimeData.pending + uptimeData.temp + uptimeData.null}`,
+    };
+  };
+
   return (
-    <div style={{ position: "relative", width: "2.2rem", height: "2.2rem" }}>
-      {/* 도넛 그래프 */}
-      <Doughnut data={data} options={options} />
-      {/* 중앙 텍스트 */}
-      <div className="absolute inset-0 flex items-center justify-center text-black text-[0.85rem] font-bold z-10 ml-[1px]">
-        {value}%
+    <div
+      onMouseEnter={(e) => {
+        const rect = e.currentTarget.getBoundingClientRect();
+        console.log("Mouse entered! Rect:", rect); // 디버깅 로그
+
+        setHoveredItem({
+          x: rect.x + window.scrollX + rect.width / 2,
+          y: rect.y + window.scrollY + rect.height + 8,
+          content: hoverContent(counts),
+        });
+      }}
+      onMouseLeave={() => setHoveredItem(null)}
+    >
+      <div style={{ position: "relative", width: "2.2rem", height: "2.2rem" }}>
+        {/* 도넛 그래프 */}
+        <Doughnut data={data} options={options} />
+        {/* 중앙 텍스트 */}
+        <div className="absolute inset-0 flex items-center justify-center text-black text-[0.85rem] font-bold z-10 ml-[1px]">
+          {value}%
+        </div>
       </div>
+      {hoveredItem && (
+        <div
+          className="absolute bg-white p-2 rounded shadow-lg text-sm border border-gray-300 z-50"
+          style={{
+            left: `${hoveredItem.x}px`,
+            top: `${hoveredItem.y}px`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <div className="text-bold">{hoveredItem.content.uptime}</div>
+          <div className="text-gray-500">{hoveredItem.content.count}</div>
+        </div>
+      )}
     </div>
   );
 }

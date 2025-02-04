@@ -13,7 +13,8 @@ export interface NodeHealth {
 }
 
 export type TransactionData = {
-  // id, updatedAt 제외한 NodeHealth 타입
+  // updatedAt 제외한 NodeHealth 타입
+  id: number;
   group_name: string;
   node_name: string;
   endpoint_url: string;

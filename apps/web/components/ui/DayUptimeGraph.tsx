@@ -35,7 +35,6 @@ export default function DayUptimeGraph({
   dayUptimeData: DayUptimeEntry[];
   isBox: boolean;
 }) {
-  //TODO : selectedHour 바뀔 때마다 렌더링 되는데, 성능 최적화 필요한지 고민
   const { nodeNames } = useNodeContext();
   const { userTimeZone } = useTimeZoneContext();
   const nodeNumber = nodeNames?.[network]?.length || 1;
@@ -113,6 +112,7 @@ export default function DayUptimeGraph({
           delay: acc.delay + curr.delay,
           total: acc.total + curr.total,
           null: acc.null + curr.null,
+          hour: 0,
         }),
         {
           pending: 0,
@@ -123,6 +123,7 @@ export default function DayUptimeGraph({
           delay: 0,
           total: 0,
           null: 0,
+          hour: 0,
         }
       );
     }, [dayUptimeData]);
@@ -145,14 +146,14 @@ export default function DayUptimeGraph({
         meaningfulDataCount >
         DAY_UPTIME_NOT_ENOUGH_DATA_THRESHOLD * maxDataNumber
           ? `${uptime || 0}%`
-          : "not enough data"
+          : `(${uptime || 0}%) - not enough data `
       }`,
       count: `Total: ${uptimeData.total}, Active: ${
         uptimeData.true
       }, Delayed: ${uptimeData.delay}, Failure: ${uptimeData.false}, Timeout: ${
         uptimeData.timeout
       }, Error: ${uptimeData.pending + uptimeData.temp + uptimeData.null}`,
-    }; //TODO 데이터 타입에 따라 수정
+    };
   };
 
   const getBarHeightForDay = (item: DayUptimeEntry) => {
@@ -224,7 +225,7 @@ export default function DayUptimeGraph({
           <ArrowRightCircleIcon className="w-5 h-5" />
         </button>
         <div className="ml-1.5">
-          <UptimeDonut uptime={overallUptime} />
+          <UptimeDonut uptime={overallUptime} counts={dayUptimeCount} />
         </div>
         {isBox && (
           <button

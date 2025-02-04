@@ -107,7 +107,6 @@ export default function StatusCard({
   return (
     <SectionWrapper backgroundColor={tabBackgroundColor}>
       <div className="max-w-[1190px] mx-auto py-4">
-        {/*TODO: 반응형으로 크기에 따라 조정*/}
         <h2 className="text-white font-bold">{message}</h2>
         <div className="flex flex-col gap-2">
           {isHealthy === "false" && (

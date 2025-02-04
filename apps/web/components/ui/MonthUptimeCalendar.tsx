@@ -158,29 +158,32 @@ const MonthUptimeCalendar: React.FC<MonthUptimeCalendarProps> = ({
 
   const getHoverContent = (dayData: DayData | undefined): string => {
     if (!dayData || dayData.total === 0) return "no data found"; // 회색 (정보 없음)
+    const uptime = ((dayData.active / dayData.total) * 100).toFixed(1);
     if (
       dayData.total <=
       nodeNumber * 24 * 60 * MONTH_UPTIME_NOT_ENOUGH_DATA_THRESHOLD
     )
-      return "not enough data";
+      return `not enough data. (uptime : ${uptime}%)`;
 
-    return (
-      "Uptime : " + ((dayData.active / dayData.total) * 100).toFixed(1) + "%"
-    );
+    return `uptime : ${uptime}%`;
   };
 
   return (
     <SectionWrapper>
       <div className="relative">
-        <div className="flex items-center justify-end mt-2">
-          <div className="font-bold text-gray-600">Monthly Uptime</div>
+        <div className="flex w-full justify-end mt-2">
           <button
+            className="flex items-center"
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
-            className={`p-1 hover:bg-gray-100 rounded-full transition-transform duration-200 text-gray-800 ${
-              isCalendarOpen ? "rotate-90" : "rotate-0"
-            }`}
           >
-            <ChevronRightIcon className="w-5 h-5" />
+            <div className="font-bold text-gray-600">Monthly Uptime</div>
+            <div
+              className={`p-1 hover:bg-gray-100 rounded-full transition-transform duration-200 text-gray-800 ${
+                isCalendarOpen ? "rotate-90" : "rotate-0"
+              }`}
+            >
+              <ChevronRightIcon className="w-5 h-5" />
+            </div>
           </button>
         </div>
         {isCalendarOpen && (

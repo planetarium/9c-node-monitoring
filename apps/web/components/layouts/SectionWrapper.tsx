@@ -9,7 +9,6 @@ export default function SectionWrapper({
   isBox?: boolean;
 }) {
   return isBox ? (
-    //TODO : 반응형 처리
     <div className="mx-auto max-w-[328.5px] min-[410px]:max-w-[379.5px] min-[540px]:max-w-[501px] min-[660px]:max-w-[622.5px] md:max-w-[744px] lg:max-w-[992px] xl:max-w-[1232px]">
       <div
         className={`px-3 py-2 lg:px-4 lg:py-3 rounded-xl ${backgroundColor}`}

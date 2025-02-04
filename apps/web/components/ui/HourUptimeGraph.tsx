@@ -1,27 +1,7 @@
 import { TransactionData } from "@/src/types";
 import { useEffect, useState } from "react";
 
-// const generate60MinuteData = () =>
-//   Array.from({ length: 60 }, (_, i) => {
-//     const rand = Math.random(); // 0 ~ 1 사이의 랜덤 값
-
-//     let uptime;
-//     if (rand < 0.1) {
-//       // 10% 확률로 70 미만
-//       uptime = 0;
-//     } else {
-//       // 90% 확률로 100
-//       uptime = 100;
-//     }
-
-//     return {
-//       label: `${i}분`,
-//       uptime,
-//     };
-//   });
-
 const getColorForHour = (item: TransactionData) => {
-  //TODO 데이터 타입에 따라 색 기준 결정
   if (item.active === "true") return "rgb(74, 222, 128)"; // 초록색 (정상)
   if (item.active === "false") return "rgb(239, 68, 68)"; // 빨간색 (심각한 문제)
   if (item.active === "delay") return "rgb(250, 204, 21)"; // 노란색 (지연 경고)
@@ -57,6 +37,7 @@ const hoverContentForHour = (label: string, item: TransactionData) => {
   return {
     label, // Minute 정보
     statusMessage: statusMessage, // 상태 메시지
+    id: item.id,
     failLog: failLog, // 로그 정보
   };
 };
@@ -77,6 +58,7 @@ export default function HourUptimeGraph({
       label: string;
       statusMessage: string;
       failLog: string | null;
+      id: number;
     };
   } | null>(null);
   const [barHeight, setBarHeight] = useState("35px");
@@ -115,6 +97,7 @@ export default function HourUptimeGraph({
         endpoint_url: "",
         txHash: "",
         timeStamp: "",
+        id: 0,
       };
     }
   }
@@ -172,9 +155,12 @@ export default function HourUptimeGraph({
             transform: "translateX(-50%)",
           }}
         >
-          <div>{`Minute: ${hoveredItem.content.label}, Status: ${hoveredItem.content.statusMessage}`}</div>
+          <div className="flex flex-row justify-between">
+            <div>{`Minute: ${hoveredItem.content.label}, Status: ${hoveredItem.content.statusMessage}`}</div>
+            <div className="text-gray-400 ml-2">{`( id: ${hoveredItem.content.id} )`}</div>
+          </div>
           {hoveredItem.content.failLog && (
-            <div className="text-gray-500">{`log : ${hoveredItem.content.failLog}`}</div>
+            <div className="text-gray-700">{`log : ${hoveredItem.content.failLog}`}</div>
           )}
         </div>
       )}

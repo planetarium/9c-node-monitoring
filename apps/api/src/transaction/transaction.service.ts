@@ -144,7 +144,7 @@ export class TransactionService {
 
       if (endpoint_url.includes('heimdall'))
         checkEndpointUrl = 'https://heimdall-rpc-2.nine-chronicles.com/graphql';
-      else checkEndpointUrl = 'https://odin-rpc-1.nine-chronicles.com/graphql'; //TODO: 원래 odin-rpc-2였는데 이거 작동 안해서 1로 바꿈. 왜 이렇게 정하는 거지? 얘네가 문제 생기면 어떡하려고?
+      else checkEndpointUrl = 'https://odin-rpc-1.nine-chronicles.com/graphql';
 
       const statuses = await this.getTxStatus(checkEndpointUrl, txIds);
       // 5. 상태별로 처리
@@ -350,8 +350,6 @@ export class TransactionService {
               total: string;
             }>();
 
-    console.log('logging timezone', startUtc, endUtc, queryEndUtc);
-
     const dataMap = new Map<string, { active: number; total: number }>();
     for (const row of rawData) {
       const dateKey = row.localDate;
@@ -364,8 +362,6 @@ export class TransactionService {
     function getDateArray(start: Date, end: Date, timeZone: string): string[] {
       const result: string[] = [];
       const current = new Date(start);
-
-      console.log('getDateArray current', current);
 
       while (current <= end) {
         // 로컬 타임존 기준 날짜 변환
@@ -840,7 +836,6 @@ export class TransactionService {
       });
       if (this.isErrorLogInclude('socket hang up', e)) {
         //socket hang up
-        //TODO : 실패로 처리할 것인지, 재시도 허용할 것인지
         return Array(txIds.length).fill({
           txStatus: 'STAGING',
           exceptionNames: ['failed state check request : socket hang up'],
@@ -907,19 +902,17 @@ export class TransactionService {
   }
 
   async getPendingTransactions() {
-    const threeDaysAgo = new Date(
-      new Date().getTime() - 3 * 24 * 60 * 60 * 1000,
-    ); // TODO : 일단 3일 전까지 조회하도록 설정했으나, 나중에 기준 설정 필요
+    const eightHoursAgo = new Date(new Date().getTime() - 8 * 60 * 60 * 1000); // TODO : 일단 8시간 전까지 조회하도록 설정했으나, 나중에 기준 설정 필요
     return await this.transactionsRepository.find({
       where: {
-        timeStamp: MoreThan(threeDaysAgo),
+        timeStamp: MoreThan(eightHoursAgo),
         active: In(['pending']),
       },
       select: ['id', 'endpoint_url', 'txHash', 'timeStamp'], // 필요한 필드만 선택
       order: {
         id: 'DESC',
       }, //id는 인덱스라 문제 없음
-      take: 100, //최대 100개 = 오래된 id 순으로 10분 분량을 처리하는 것으로 제한하여 리소스 사용량 제한
+      take: 100, //최대 100개 = 최근 id 순으로 10분 분량을 처리하는 것으로 제한하여 리소스 사용량 제한
     });
   }
 
