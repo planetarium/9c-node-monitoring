@@ -185,7 +185,7 @@ export class AccountService {
 
   async updateAllAccountBalances(): Promise<void> {
     try {
-      console.log('Updating account balances...');
+      // console.log('Updating account balances...');
       const { newOdinBalances, newHeimdallBalances } =
         await this.getAllAccountBalances();
 
@@ -318,7 +318,7 @@ export class AccountService {
   public clearUsedAccounts(): void {
     this.usedAccounts.odin.clear();
     this.usedAccounts.heimdall.clear();
-    console.log('Cleared used accounts for both Odin and Heimdall.');
+    // console.log('Cleared used accounts for both Odin and Heimdall.');
   }
 }
 

@@ -171,7 +171,7 @@ export default function DayUptimeGraph({
       new Date().toISOString().split("T")[0]
     ) {
       onBarClick(selectedHour ? null : currentTimezoneHour);
-      console.log(currentTimezoneHour);
+      // console.log(currentTimezoneHour);
     } else {
       onBarClick(selectedHour ? null : 23);
     }

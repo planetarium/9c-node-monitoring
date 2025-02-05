@@ -76,8 +76,6 @@ export default function UptimeDonut({
     <div
       onMouseEnter={(e) => {
         const rect = e.currentTarget.getBoundingClientRect();
-        console.log("Mouse entered! Rect:", rect); // 디버깅 로그
-
         setHoveredItem({
           x: rect.x + window.scrollX + rect.width / 2,
           y: rect.y + window.scrollY + rect.height + 8,

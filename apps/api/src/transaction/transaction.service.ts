@@ -68,7 +68,7 @@ export class TransactionService {
     this.sendCount++;
 
     if (this.sendCount === 1) {
-      console.log('send count : ', this.sendCount, 'update balance.');
+      // console.log('send count : ', this.sendCount, 'update balance.');
       try {
         await this.accountService.updateAllAccountBalances();
         this.isBalanceChecked = true; // 한번이라도 체크를 한 경우에만 계좌 배분 시스템 활용 가능
@@ -114,7 +114,7 @@ export class TransactionService {
     }> = await this.getPendingTransactions(); // 명시적 타입
 
     console.log(
-      'updatependingTransactions. count: ',
+      'updatependingTransactions start. count: ',
       pendingTransactions.length,
     );
 
@@ -139,7 +139,7 @@ export class TransactionService {
     for (const [endpoint_url, transactions] of Object.entries(
       groupedTransactions,
     )) {
-      console.log('start checking status', endpoint_url);
+      // console.log('start checking status', endpoint_url);
       const txIds = transactions.map((tx) => tx.txHash); // 해당 endpoint_url에 해당하는 txHash 배열
 
       if (endpoint_url.includes('heimdall'))
@@ -165,7 +165,7 @@ export class TransactionService {
             console.log('updateCompletedTx', result.id, elapsedTime);
           } else {
             await this.updateDelayedTx(result.id);
-            console.log('updateCompletedTx', result.id, elapsedTime);
+            console.log('updateDelayedTx', result.id, elapsedTime);
           }
         } else if (
           result.status.txStatus === 'STAGING' ||
@@ -180,9 +180,9 @@ export class TransactionService {
             elapsedTime,
           );
           if (elapsedTime > 180) {
-            // 3분 이상 STAGING 상태인 경우 timout으로 처리
+            // 3분 이상 STAGING 상태인 경우 timeout으로 처리
             console.log(
-              `Transaction ${row.txHash} has been staging for ${elapsedTime} seconds. Marking as FAILED.`,
+              `Transaction ${row.txHash} has been staging for ${elapsedTime} seconds. Marking as timeout.`,
             );
             await this.updateFailedTx(
               result.id,
@@ -191,9 +191,9 @@ export class TransactionService {
             );
           } else {
             console.log(
-              'did not update delyed Tx from ',
+              'staging continued from',
               result.status.txStatus,
-              'id: ',
+              'id:',
               result.id,
             );
           }
@@ -211,18 +211,18 @@ export class TransactionService {
             false,
           );
           console.error(
-            'Unexpected status in updatePendingTransactions. STATUS : ',
+            'ERROR: Unexpected status in updatePendingTransactions. STATUS : ',
             result.status.txStatus,
             'id : ',
             result.id,
+            'add the case for this status.',
           );
         }
       }
     }
-    console.log('updatePendingTransactions end');
 
     if (this.sendCount % this.balanceUpdateThreshold === 0) {
-      console.log('send count : ', this.sendCount, 'update balance');
+      //console.log('send count : ', this.sendCount, 'update balance');
       try {
         await this.accountService.updateAllAccountBalances();
         this.isBalanceChecked = true; // 한번이라도 체크를 한 경우에만 계좌 배분 시스템 활용
@@ -428,7 +428,7 @@ export class TransactionService {
   ) {
     for (let i = 0; i < rpcEndpoints.length; i++) {
       if (i >= this.accounts.length) {
-        console.log('More endpoints than accounts'); //만약 엔드포인트가 훨씬 더 늘어났을 경우 계정 생성 바람.
+        console.log('ERROR: More endpoints than accounts. add more'); //만약 엔드포인트가 훨씬 더 늘어났을 경우 계정 생성 바람.
         break;
       }
       const transaction = new Transaction();
@@ -437,7 +437,7 @@ export class TransactionService {
       transaction.endpoint_url = rpcEndpoints[i];
       transaction.active = 'temp';
       try {
-        console.log(await this.transactionsRepository.save(transaction));
+        await this.transactionsRepository.save(transaction);
       } catch (error) {
         console.error(error);
       }
@@ -483,26 +483,18 @@ export class TransactionService {
         continue;
       }
 
-      console.log(
-        groupName,
-        ', endpoint-',
-        i,
-        ' : ',
-        senderIndex,
-        '->',
-        receiverIndex,
-      );
+      // console.log(
+      //   groupName,
+      //   ', endpoint-',
+      //   i,
+      //   ' : ',
+      //   senderIndex,
+      //   '->',
+      //   receiverIndex,
+      // );
 
       const sender = this.accounts[senderIndex].address;
       const recipient = this.accounts[receiverIndex].address;
-      console.log(
-        'accountNumber',
-        accountNumber,
-        'sender',
-        sender,
-        'recipient',
-        recipient,
-      );
       let action;
       const amount = BigInt(1);
       if (groupName === 'odin')
@@ -520,8 +512,8 @@ export class TransactionService {
           );
           continue;
         }
-        console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
-        console.log('Sender', sender, 'Recipient', recipient);
+        // console.log('Network', rpcEndpoints[i], 'sendtx', txHash);
+        // console.log('Sender', sender, 'Recipient', recipient);
         this.accountService.updateBalance(
           groupName,
           senderIndex,
@@ -825,7 +817,7 @@ export class TransactionService {
             }
         `,
       });
-      console.log('getTxStatus', endpoint, txIds);
+      console.log('getTxStatus', txIds);
 
       return data['data']['transaction']['transactionResults']; // 여러 결과가 배열로 반환됨
     } catch (e) {

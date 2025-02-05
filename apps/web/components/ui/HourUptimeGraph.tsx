@@ -155,10 +155,10 @@ export default function HourUptimeGraph({
             transform: "translateX(-50%)",
           }}
         >
-          <div className="flex flex-row justify-between">
-            <div>{`Minute: ${hoveredItem.content.label}, Status: ${hoveredItem.content.statusMessage}`}</div>
-            <div className="text-gray-400 ml-2">{`( id: ${hoveredItem.content.id} )`}</div>
-          </div>
+          <p>
+            <span>{`Minute: ${hoveredItem.content.label}, Status: ${hoveredItem.content.statusMessage}`}</span>
+            <span className="text-gray-400">{`  (id: ${hoveredItem.content.id})`}</span>
+          </p>
           {hoveredItem.content.failLog && (
             <div className="text-gray-700">{`log : ${hoveredItem.content.failLog}`}</div>
           )}

@@ -24,7 +24,7 @@ export class TransactionController {
     @Query('start2') start2?: string,
     @Query('end2') end2?: string,
   ) {
-    console.log('controller:getStatus', start, end, group, start2, end2);
+    // console.log('controller:getStatus', start, end, group, start2, end2);
 
     const result = await this.transactionService.fetchTransactions(
       start,

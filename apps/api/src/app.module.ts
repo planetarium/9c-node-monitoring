@@ -32,10 +32,6 @@ import { TransactionModule } from './transaction/transaction.module';
   providers: [AppService],
 })
 export class AppModule {
-  constructor() {
-    // 환경 변수 값 출력
-    console.log('DB_USERNAME:', process.env.DB_USERNAME);
-    console.log('DB_PASSWORD:', process.env.DB_PASSWORD);
-  }
+  constructor() {}
 }
 
